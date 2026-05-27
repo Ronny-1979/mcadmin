@@ -1877,6 +1877,24 @@ function get_installed_packs(string $type = 'behavior'): array {
     return $packs;
 }
 
+// Sucht einen Pack-Namen anhand der UUID in ALLEN Pack-Verzeichnissen (inkl. Bedrock-Systempacks).
+// Gibt null zurück wenn nichts gefunden wurde.
+function find_pack_name_anywhere(string $type, string $uuid): ?string {
+    $dir = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
+    if (!is_dir($dir)) return null;
+    foreach (scandir($dir) as $d) {
+        if ($d === '.' || $d === '..') continue;
+        $path     = $dir . '/' . $d;
+        $manifest = $path . '/manifest.json';
+        if (!is_dir($path) || !file_exists($manifest)) continue;
+        $data = json_decode(file_get_contents($manifest), true) ?: [];
+        if (strtolower($data['header']['uuid'] ?? '') === strtolower($uuid)) {
+            return $data['header']['name'] ?? null;
+        }
+    }
+    return null;
+}
+
 // Gibt die aktiven Pack-Referenzen einer Welt zurück, plus fehlende Packs (UUID-Liste)
 function get_world_packs(string $worldName): array {
     $state = get_state();
@@ -1896,6 +1914,7 @@ function get_world_packs(string $worldName): array {
                 $missing[] = [
                     'uuid'    => $normRef['pack_id'],
                     'version' => $normRef['version'] ? implode('.', $normRef['version']) : '?',
+                    'name'    => find_pack_name_anywhere($pt, $normRef['pack_id']),
                 ];
             }
         }

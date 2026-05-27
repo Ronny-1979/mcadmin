@@ -584,7 +584,7 @@ function renderPacks(){
     // Fehlende Packs (UUID vorhanden, aber nicht installiert)
     if(missing.length){
       html+=`<div style="margin-top:8px;padding:4px 2px;font-size:11px;color:var(--text2)">Fehlende Packs — nicht auf diesem Server installiert:</div>`;
-      html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${e(mp.uuid.substring(0,18))}…</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div></div><span class="badge badge-r" style="flex-shrink:0">Fehlt</span></div>`).join('');
+      html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${mp.name?e(mp.name):'Unbekanntes Pack'}</div><div class="pkv" style="user-select:all">${e(mp.uuid)}</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div></div><span class="badge badge-r" style="flex-shrink:0">Fehlt</span></div>`).join('');
     }
     if(!html){
       html=`<div class="dim xs2" style="text-align:center;padding:18px">${world?'Keine Packs für diese Welt':'Keine Packs installiert'}</div>`;
