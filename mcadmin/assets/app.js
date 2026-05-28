@@ -626,7 +626,7 @@ function renderPacks(){
     let html='';
     if(packs.length){
       html+=packs.map(p=>{
-        const en=active.some(a=>(typeof a==='string'?a:a.pack_id)===p.uuid);
+        const en=active.some(a=>(typeof a==='string'?a:(a.pack_id??a.uuid))===p.uuid);
         return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${!world?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
       }).join('');
     }

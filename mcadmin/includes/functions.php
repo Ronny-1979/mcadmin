@@ -1952,7 +1952,7 @@ function get_world_packs(string $worldName): array {
             $resolved[] = [
                 'uuid'    => $normRef['pack_id'],
                 'version' => $normRef['version'] ? implode('.', $normRef['version']) : '?',
-                'name'    => $inst ? ($inst['header']['name'] ?? 'Unbekannt')
+                'name'    => $inst ? ($inst['name'] ?? 'Unbekannt')
                                    : (find_pack_name_anywhere($pt, $normRef['pack_id']) ?? 'Unbekannt'),
             ];
             if (!$inst) {
