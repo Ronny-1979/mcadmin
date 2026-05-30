@@ -451,23 +451,32 @@ async function toggleInstalledPanel(worldName){
   panel.innerHTML='<div class="dim xs2" style="padding:6px 0"><span class="spin">⟳</span> Lade...</div>';
   try{
     const data=await api('get_world_packs',{world:worldName});
-    const installed=[...(data.behavior||[]).map(p=>({...p,type:'behavior'})),
-                     ...(data.resource||[]).map(p=>({...p,type:'resource'}))];
-    if(!installed.length){panel.innerHTML='<div class="dim xs2" style="padding:6px 0">Keine Packs in dieser Welt.</div>';return;}
+    const all=[...(data.behavior||[]).map(p=>({...p,ptype:'behavior'})),
+               ...(data.resource||[]).map(p=>({...p,ptype:'resource'}))];
+    if(!all.length){panel.innerHTML='<div class="dim xs2" style="padding:6px 0">Keine Packs zugeordnet.</div>';return;}
     panel.innerHTML=`<div style="margin-top:8px">
-      <div style="font-weight:600;font-size:13px;margin-bottom:8px">Installierte Packs (${installed.length}):</div>
-      ${installed.map(p=>`<div class="pkc">
-        <div class="pki">${p.type==='behavior'?'⚙️':'🎨'}</div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px">Zugeordnete Packs (${all.length}):</div>
+      ${all.map(p=>`<div class="pkc">
+        <div class="pki">${p.ptype==='behavior'?'⚙️':'🎨'}</div>
         <div style="flex:1;min-width:0">
           <div class="pkn">${e(p.name)}</div>
-          <div class="pkv"><span class="badge badge-${p.type==='behavior'?'b':'p'}">${p.type==='behavior'?'Behavior':'Resource'}</span> v${e(p.version)}</div>
+          <div class="pkv"><span class="badge badge-${p.ptype==='behavior'?'b':'p'}">${p.ptype==='behavior'?'Behavior':'Resource'}</span> v${e(p.version)}</div>
         </div>
-        <button class="icon-btn" title="Aus Welt entfernen" onclick="removePackFromWorld('${e(worldName)}','${e(p.uuid)}','${e(p.type)}','${e(p.name)}')">✕</button>
+        <label class="tgl"><input type="checkbox" ${p.enabled!==false?'checked':''}
+          onchange="togglePkWorld('${e(worldName)}','${e(p.uuid)}','${e(p.ptype)}',this.checked,'${e(p.name)}')">
+          <span class="tsl"></span></label>
+        <button class="icon-btn" title="Pack komplett entfernen" onclick="removePackFromWorld('${e(worldName)}','${e(p.uuid)}','${e(p.ptype)}','${e(p.name)}')">✕</button>
       </div>`).join('')}
     </div>`;
   }catch(err){panel.innerHTML='<div class="dim xs2" style="padding:6px 0">❌ Fehler beim Laden.</div>';}
 }
-// Entfernt ein Pack aus einer Welt und aktualisiert die Welten-Liste
+// Aktiviert/deaktiviert ein Pack für eine Welt direkt aus dem World-Panel
+async function togglePkWorld(worldName,uuid,type,checked,name){
+  const r=await api('toggle_pack',{world:worldName,uuid,type,enable:checked?'1':'0'});
+  if(r.success){toast(checked?name+' aktiviert':name+' deaktiviert','success');}
+  else{toast('Fehler','error');}
+}
+// Entfernt ein Pack komplett aus einer Welt und aktualisiert die Welten-Liste
 async function removePackFromWorld(worldName,uuid,type,name){
   if(!confirm('Pack "'+name+'" aus dieser Welt entfernen?'))return;
   try{
@@ -626,7 +635,7 @@ function renderPacks(){
     let html='';
     if(packs.length){
       html+=packs.map(p=>{
-        const en=active.some(a=>(typeof a==='string'?a:(a.pack_id??a.uuid))===p.uuid);
+        const en=active.some(a=>{const id=typeof a==='string'?a:(a.pack_id??a.uuid);return id===p.uuid&&(a.enabled!==false);});
         return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${!world?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
       }).join('');
     }
