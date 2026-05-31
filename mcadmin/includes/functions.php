@@ -1137,6 +1137,7 @@ function get_worlds(): array {
         $missingCount = 0;
         foreach (['behavior', 'resource'] as $pt) {
             foreach ($state['world_packs'][$d][$pt] ?? [] as $ref) {
+                if (isset($ref['enabled']) && $ref['enabled'] === false) continue;
                 $normRef = normalize_pack_ref($ref);
                 if ($normRef === null) continue;
                 $found = false;
@@ -1945,6 +1946,7 @@ function get_world_packs(string $worldName): array {
         foreach ($result[$pt] ?? [] as $ref) {
             $normRef = normalize_pack_ref($ref);
             if ($normRef === null) continue;
+            $enabled = $ref['enabled'] ?? true;
             $inst = find_installed_pack($pt, $normRef['pack_id'], $normRef['version']);
             if (!$inst && $normRef['version'] === null) {
                 $inst = find_installed_pack($pt, $normRef['pack_id']);
@@ -1954,8 +1956,9 @@ function get_world_packs(string $worldName): array {
                 'version' => $normRef['version'] ? implode('.', $normRef['version']) : '?',
                 'name'    => $inst ? ($inst['name'] ?? 'Unbekannt')
                                    : (find_pack_name_anywhere($pt, $normRef['pack_id']) ?? 'Unbekannt'),
+                'enabled' => $enabled,
             ];
-            if (!$inst) {
+            if (!$inst && $enabled) {
                 $missing[] = [
                     'uuid'        => $normRef['pack_id'],
                     'version'     => $normRef['version'] ? implode('.', $normRef['version']) : '?',
@@ -1986,20 +1989,34 @@ function toggle_pack_for_world(string $worldName, string $packUuid, string $pack
 
     if ($enable) {
         $pack = find_installed_pack($packType, $packUuid);
+        if (!$pack) return false;
 
-        if (!$pack) {
-            return false;
+        $alreadyIn = false;
+        foreach ($state['world_packs'][$worldName][$packType] as &$ref) {
+            if (pack_ref_matches_uuid($ref, $packUuid)) {
+                $ref['enabled'] = true;
+                $alreadyIn = true;
+                break;
+            }
         }
+        unset($ref);
 
-        add_pack_ref(
-            $state['world_packs'][$worldName][$packType],
-            $pack['uuid'],
-            $pack['version']
-        );
-
-        add_pack_dependencies_for_world($state, $worldName, $pack);
+        if (!$alreadyIn) {
+            $state['world_packs'][$worldName][$packType][] = [
+                'pack_id' => $pack['uuid'],
+                'version' => pack_version_array($pack['version']),
+                'enabled' => true,
+            ];
+            add_pack_dependencies_for_world($state, $worldName, $pack);
+        }
     } else {
-        remove_pack_ref_by_uuid($state['world_packs'][$worldName][$packType], $packUuid);
+        foreach ($state['world_packs'][$worldName][$packType] as &$ref) {
+            if (pack_ref_matches_uuid($ref, $packUuid)) {
+                $ref['enabled'] = false;
+                break;
+            }
+        }
+        unset($ref);
     }
 
     return save_state($state);
@@ -2029,6 +2046,7 @@ function apply_world_packs(string $worldName): void {
         $activePacks = [];
 
         foreach (($packs[$type] ?? []) as $entry) {
+            if (($entry['enabled'] ?? true) === false) continue;
             $ref = normalize_pack_ref($entry);
             if ($ref === null) continue;
 
@@ -2069,6 +2087,7 @@ function apply_world_packs(string $worldName): void {
     // auf format_version "1.20.80" — damit laden Items ohne Experiment in BDS 1.21.20+.
     // Wird auch für bereits installierte Packs ausgeführt (retroaktiver Fix).
     foreach (($packs['behavior'] ?? []) as $ref) {
+        if (($ref['enabled'] ?? true) === false) continue;
         $normRef = normalize_pack_ref($ref);
         if ($normRef === null) continue;
         $installedP = find_installed_pack('behavior', $normRef['pack_id'], $normRef['version']);
