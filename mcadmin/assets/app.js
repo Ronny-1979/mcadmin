@@ -792,13 +792,15 @@ async function checkPanelUpdate(force){
 function updateSidebarVer(){
   const mc=document.getElementById('sver-mc');
   const pan=document.getElementById('sver-panel');
+  const toSettings=`showPage('settings',document.querySelector('[onclick*=settings]'));return false;`;
   if(mc&&G.ver){
-    if(G.ver.update_available){mc.innerHTML=`<a href="#" class="ver-link" onclick="showPage('settings',document.querySelector('[onclick*=settings]'));return false;">MC v${e(G.ver.current)} ↑</a>`;}
-    else{mc.textContent=G.ver.current?'MC v'+G.ver.current:'';}
+    if(G.ver.update_available){mc.innerHTML=`<a href="#" class="ver-upd" onclick="${toSettings}">MC v${e(G.ver.current)} ⬆</a>`;}
+    else{mc.innerHTML=G.ver.current?`<span class="ver-ok">MC v${e(G.ver.current)}</span>`:'';}
   }
   if(pan&&G.pver){
-    if(G.pver.update_available){pan.innerHTML=`<a href="#" class="ver-link" onclick="showPage('settings',document.querySelector('[onclick*=settings]'));return false;">Panel v${e(G.pver.current)} ↑</a>`;}
-    else{pan.textContent=G.pver.current?'Panel v'+G.pver.current:'';}
+    if(G.pver.update_available){pan.innerHTML=`<a href="#" class="ver-upd" onclick="${toSettings}">Panel v${e(G.pver.current)} ⬆</a>`;}
+    else{pan.innerHTML=G.pver.current?`<span class="ver-ok">Panel v${e(G.pver.current)}</span>`:'';
+    }
   }
 }
 let panelUpdTimer=null;

@@ -50,6 +50,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .topbar2{background:#222;border-bottom:3px solid #111;padding:4px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:48px;z-index:49;box-shadow:0 2px 0 #333}
 .tb-wn{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
 .ver-link{color:var(--yellow);text-decoration:none;font-size:11px}.ver-link:hover{text-decoration:underline}
+.ver-ok{color:var(--green);font-size:11px}
+.ver-upd{color:var(--red);font-size:11px;text-decoration:none;animation:ver-blink 1.2s ease-in-out infinite}
+.ver-upd:hover{text-decoration:underline;opacity:1}
+@keyframes ver-blink{0%,100%{opacity:1}50%{opacity:.25}}
 .pt{font-size:10px;font-weight:700;font-family:'Press Start 2P',monospace;text-shadow:1px 1px #000}
 .content{padding:18px;flex:1}
 
