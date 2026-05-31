@@ -70,7 +70,7 @@ try {
             echo json_encode([
                 'current'          => $current,
                 'latest'           => $latest['sha'],
-                'update_available' => !$shaKnown || $latest['sha'] !== $current,
+                'update_available' => $shaKnown && $current !== 'unbekannt' && $latest['sha'] !== $current,
                 'has_update_script'=> true,
             ]); break;
         case 'start_panel_update':    // Startet das Panel-Update im Hintergrund
