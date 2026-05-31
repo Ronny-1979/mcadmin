@@ -8,6 +8,7 @@
   --purple:#8b6bb1;--pd:#3d2063;--orange:#fb923c;--od:#7c2d12;
   --accent:#55bbcc;--ah:#3a8a99;--r:0px;--rl:0px;
   --mc3d-hi:rgba(255,255,255,.25);--mc3d-sh:rgba(0,0,0,.55);
+  --card:#383838;
 }
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;font-size:14px}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -254,6 +255,7 @@ select.pinp option{background:var(--bg3)}
 .badge-y{background:rgba(251,191,36,.12);color:var(--yellow)}
 .badge-o{background:rgba(251,146,60,.15);color:#f97316;border-color:rgba(249,115,22,.3)}
 .badge-r{background:rgba(248,113,113,.15);color:var(--red);border-color:rgba(248,113,113,.3)}
+.badge-p{background:rgba(139,107,177,.15);color:var(--purple);border-color:rgba(139,107,177,.3)}
 .divider{height:1px;background:var(--border);margin:14px 0}
 
 /* MOBILE OVERLAY */

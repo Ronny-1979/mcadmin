@@ -132,13 +132,13 @@ async function srvAction(a){
 
 // ═══ PLAYER ACTIONS ════════════════════════════════════════
 // Erteilt einem Spieler OP-Rechte und aktualisiert die Anzeige
-async function opP(n){const r=await api('op_player',{name:n});toast(r.output||r.message||(r.success?`${n} ist jetzt OP`:'Fehler'),r.success?'success':'error');if(r.success){setTimeout(refreshStatus,500);if(document.getElementById('wl-tbody'))loadWl();}}
+async function opP(n){try{const r=await api('op_player',{name:n});toast(r.output||r.message||(r.success?`${n} ist jetzt OP`:'Fehler'),r.success?'success':'error');if(r.success){setTimeout(refreshStatus,500);if(document.getElementById('wl-tbody'))loadWl();}}catch(err){toast('Fehler: '+err.message,'error');}}
 // Entzieht einem Spieler die OP-Rechte und aktualisiert die Anzeige
-async function deopP(n){const r=await api('deop_player',{name:n});toast(r.output||r.message||(r.success?`${n} ist kein OP mehr`:'Fehler'),r.success?'success':'error');if(r.success){setTimeout(refreshStatus,500);if(document.getElementById('wl-tbody'))loadWl();}}
+async function deopP(n){try{const r=await api('deop_player',{name:n});toast(r.output||r.message||(r.success?`${n} ist kein OP mehr`:'Fehler'),r.success?'success':'error');if(r.success){setTimeout(refreshStatus,500);if(document.getElementById('wl-tbody'))loadWl();}}catch(err){toast('Fehler: '+err.message,'error');}}
 // Fragt nach einem Kickgrund und kickt den Spieler vom Server
-async function kickP(n){const reason=prompt(`Kickgrund für ${n}:`,'Kicked by admin');if(reason===null)return;const r=await api('kick_player',{name:n,reason});toast(r.success?`${n} gekickt`:'Fehler',r.success?'success':'error');setTimeout(refreshStatus,1500);}
+async function kickP(n){const reason=prompt(`Kickgrund für ${n}:`,'Kicked by admin');if(reason===null)return;try{const r=await api('kick_player',{name:n,reason});toast(r.success?`${n} gekickt`:'Fehler',r.success?'success':'error');setTimeout(refreshStatus,1500);}catch(err){toast('Fehler: '+err.message,'error');}}
 // Fügt einen Online-Spieler direkt zur Whitelist hinzu
-async function wlAdd(n){const r=await api('whitelist_add',{name:n});toast(r.message,r.success?'success':'warn');}
+async function wlAdd(n){try{const r=await api('whitelist_add',{name:n});toast(r.message,r.success?'success':'warn');}catch(err){toast('Fehler: '+err.message,'error');}}
 
 // ═══ CONSOLE ══════════════════════════════════════════════
 // Passt die Konsolenhöhe dynamisch an das verfügbare Fenster an

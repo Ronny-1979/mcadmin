@@ -42,7 +42,7 @@ try {
   document.documentElement.dataset.theme = 'dark';
 }
 </script>
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
 <body>
 <!-- ═══ SVG SPRITES ═══ -->
@@ -604,7 +604,7 @@ try {
 </div><!-- /layout -->
 <div id="tc"></div>
 
-<script src="assets/app.js?v=21" defer></script>
+<script src="assets/app.js?v=22" defer></script>
 <?php endif; ?>
 </body>
 </html>

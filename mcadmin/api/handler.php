@@ -153,9 +153,12 @@ try {
             echo json_encode(get_world_packs($_POST['world']??get_active_world()??'')); break;
         case 'toggle_pack':     // Aktiviert oder deaktiviert ein Pack für eine Welt
             $world  = $_POST['world']??'';
-            $uuid   = $_POST['uuid']??'';
+            $uuid   = strtolower($_POST['uuid']??'');
             $type   = $_POST['type']??'resource';
             $enable = filter_var($_POST['enable']??false, FILTER_VALIDATE_BOOLEAN);
+            if (!preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world))  { echo json_encode(['success'=>false,'message'=>'Ungültiger Weltname']); break; }
+            if (!preg_match('/^[a-f0-9\-]{36}$/', $uuid))           { echo json_encode(['success'=>false,'message'=>'Ungültige UUID']);    break; }
+            if (!in_array($type, ['behavior','resource']))           { echo json_encode(['success'=>false,'message'=>'Ungültiger Typ']);    break; }
             $ok     = toggle_pack_for_world($world,$uuid,$type,$enable);
             if ($ok) apply_world_packs($world);
             echo json_encode(['success'=>$ok]); break;
@@ -231,7 +234,9 @@ try {
                 echo json_encode(['success'=>false,'message'=>'Nur .tar.gz-Dateien erlaubt']); break;
             }
             $dest = MC_BACKUP_DIR.'/'.$importName;
-            move_uploaded_file($_FILES['backup']['tmp_name'], $dest);
+            if (!move_uploaded_file($_FILES['backup']['tmp_name'], $dest)) {
+                echo json_encode(['success'=>false,'message'=>'Datei konnte nicht gespeichert werden']); break;
+            }
             echo json_encode(['success'=>true,'message'=>'Backup importiert: '.$importName]); break;
 
         // ── CONSOLE ───────────────────────────────────────────
