@@ -65,6 +65,7 @@ const PT={dashboard:'Übersicht',
 // Wechselt zur angegebenen Seite und lädt deren Daten
 function showPage(page,el){
   G.tab=page;
+  location.hash=page;
   document.querySelectorAll('.pc2').forEach(p=>p.classList.add('hidden'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+page).classList.remove('hidden');
@@ -938,6 +939,12 @@ function e(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 // ═══ INIT ═════════════════════════════════════════════════
 (async function(){
   setTheme(getTheme());
+  const _validPages=['dashboard','worlds','packs','stats','whitelist','settings'];
+  const _hash=location.hash.slice(1);
+  if(_validPages.includes(_hash)){
+    const _navEl=document.querySelector(`.ni[onclick*="'${_hash}'"]`);
+    showPage(_hash,_navEl);
+  }
   await refreshStatus();
   setInterval(refreshStatus,10000);
   setupDrop('bk-drop','bk-imp',importBk);
