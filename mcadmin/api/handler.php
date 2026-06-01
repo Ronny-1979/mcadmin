@@ -109,7 +109,8 @@ try {
             try {
                 echo json_encode(install_world($_FILES['world']['tmp_name'], $_FILES['world']['name']));
             } catch (Throwable $ex) {
-                echo json_encode(['success' => false, 'message' => 'PHP-Fehler: ' . $ex->getMessage() . ' in ' . basename($ex->getFile()) . ':' . $ex->getLine()]);
+                error_log('[mcadmin] ' . $ex->getMessage() . ' in ' . $ex->getFile() . ':' . $ex->getLine());
+                echo json_encode(['success' => false, 'message' => 'Interner Fehler beim Importieren der Welt.']);
             }
             break;
         case 'get_worlds':    echo json_encode(get_worlds()); break;                                    // Gibt alle Welten zurück

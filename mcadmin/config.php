@@ -91,7 +91,9 @@ function load_settings(): array {
 
 // Speichert die Einstellungen als formatiertes JSON in mcadmin_settings.json
 function save_settings(array $s): bool {
-    return file_put_contents(MC_SETTINGS_FILE, json_encode($s, JSON_PRETTY_PRINT)) !== false;
+    $tmp = MC_SETTINGS_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode($s, JSON_PRETTY_PRINT)) === false) return false;
+    return rename($tmp, MC_SETTINGS_FILE);
 }
 
 // State

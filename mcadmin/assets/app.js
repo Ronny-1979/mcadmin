@@ -104,6 +104,7 @@ async function refreshStatus(){
 // Rendert die Online-Spieler-Liste mit Aktions-Buttons (OP, Kick, Whitelist)
 function renderPlayers(pl){
   const el=document.getElementById('d-plist');
+  if(!el)return;
   if(!pl.length){el.innerHTML='<div class="dim xs2" style="text-align:center;padding:18px">Keine Spieler online</div>';resizeCon();return;}
   el.innerHTML=pl.map(p=>{
     const opBtn=p.is_op
@@ -260,6 +261,7 @@ let updTimer=null;
 // Fügt einen Schritt-Eintrag in das Update-Log-Panel ein oder aktualisiert ihn
 function addUpdLog(step,status,msg){
   const log=document.getElementById('upd-log');
+  if(!log)return;
   const ic={running:'<span class="spin">⟳</span>',done:'✅',error:'❌'};
   const co={running:'var(--yellow)',done:'var(--green)',error:'var(--red)'};
   const id='ul-'+step;let el=document.getElementById(id);
@@ -281,7 +283,7 @@ async function pollUpd(){
 async function startUpdate(){
   const ver=G.ver?.latest;if(!ver||ver==='unbekannt'){toast('Keine Version','error');return;}
   if(!confirm(`${ver} installieren?\n1. Server stoppen\n2. Backup erstellen\n3. Download\n4. Neue Version installieren\n5. Welten/Packs/Einstellungen wiederherstellen\n6. Server starten`))return;
-  document.getElementById('btn-upd').disabled=true;document.getElementById('upd-log').innerHTML='';
+  document.getElementById('btn-upd').disabled=true;const _ul=document.getElementById('upd-log');if(_ul)_ul.innerHTML='';
   addUpdLog('init','running','Starte...');
   const r=await api('start_update',{version:ver});
   if(!r.success){toast('Fehler','error');document.getElementById('btn-upd').disabled=false;return;}

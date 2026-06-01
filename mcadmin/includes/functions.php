@@ -2350,13 +2350,17 @@ BASH;
 function get_backup_status(): array {
     $f = '/tmp/mcadmin_backup_status.json';
     if (!file_exists($f)) return ['status' => 'idle', 'message' => ''];
-    $data = json_decode(file_get_contents($f), true) ?? ['status' => 'idle', 'message' => ''];
+    $fp = fopen($f, 'c+');
+    if (!$fp) return ['status' => 'idle', 'message' => ''];
+    if (!flock($fp, LOCK_EX)) { fclose($fp); return ['status' => 'idle', 'message' => '']; }
+    $data = json_decode(stream_get_contents($fp), true) ?? ['status' => 'idle', 'message' => ''];
     if (($data['status'] ?? '') === 'done' && empty($data['discord_sent']) && !empty($data['filename'])) {
         discord_notify('backup_created', "💾 **Backup erstellt:** `{$data['filename']}`");
         cleanup_old_backups();
         $data['discord_sent'] = true;
-        file_put_contents($f, json_encode($data));
+        ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($data));
     }
+    flock($fp, LOCK_UN); fclose($fp);
     return $data;
 }
 
@@ -2967,7 +2971,11 @@ function get_state(): array {
     return json_decode(file_get_contents(MC_STATE_FILE),true)??['active_world'=>null,'world_packs'=>[]];
 }
 // Speichert den Panel-State als formatiertes JSON auf die Festplatte
-function save_state(array $state): bool { return file_put_contents(MC_STATE_FILE,json_encode($state,JSON_PRETTY_PRINT))!==false; }
+function save_state(array $state): bool {
+    $tmp = MC_STATE_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT)) === false) return false;
+    return rename($tmp, MC_STATE_FILE);
+}
 // Formatiert eine Byte-Zahl als lesbare Größenangabe (B/KB/MB/GB)
 function format_bytes(int $bytes): string {
     if($bytes>=1073741824) return number_format($bytes/1073741824,2).' GB';
