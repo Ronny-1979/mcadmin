@@ -612,13 +612,13 @@ async function loadWorldsForPacks(){
   await refreshStatus();
   const sel=document.getElementById('pk-world');const worlds=await api('get_worlds');
   sel.innerHTML='<option value="">-- Welt wählen --</option>'+worlds.map(w=>`<option value="${e(w.name)}" ${w.name===G.srv.active_world?'selected':''}>${e(w.name)}${w.missing_packs_count>0?' ⚠️':''}</option>`).join('');
-  if(G.srv.active_world)loadWPacks();
+  if(G.srv.active_world)await loadWPacks();
 }
 // Lädt alle installierten Behavior- und Resource-Packs und rendert sie
 async function loadAllPacks(){G.packs=await api('get_packs');renderPacks();}
 // Lädt die aktiven Packs der gewählten Welt (inkl. fehlende Packs) und rendert sie
 async function loadWPacks(){const w=document.getElementById('pk-world').value;if(!w)return;G.wPacks=await api('get_world_packs',{world:w});renderPacks();}
-// Rendert die Pack-Listen: nur Packs der gewählten Welt anzeigen + fehlende Packs
+// Rendert die Pack-Listen: alle installierten Packs anzeigen, Toggle je nach Welt aktiv/inaktiv
 function renderPacks(){
   const world=document.getElementById('pk-world').value;
   ['resource','behavior'].forEach(t=>{
@@ -627,9 +627,7 @@ function renderPacks(){
     const missing=G.wPacks[t+'_missing']||[];
     const el=document.getElementById((t==='resource'?'res':'beh')+'-list');
 
-    const packs=world
-      ? allPacks.filter(p=>(p.used_by_worlds||[]).includes(world)||(p.imported_by_worlds||[]).includes(world))
-      : allPacks;
+    const packs=allPacks;
     const worldBadges=p=>{const ws=[...(p.used_by_worlds||[]),...(p.imported_by_worlds||[])];const u=[...new Set(ws)];return u.length?`<div class="pkv" style="margin-top:2px">${u.map(w=>`<span class="badge badge-g" style="font-size:9px;margin-right:3px">${e(w)}</span>`).join('')}</div>`:''};
 
     const subtypeBadge=s=>({script:'<span class="badge badge-o">Script</span>',data:'<span class="badge badge-d">Behavior</span>',resources:'<span class="badge badge-b">Resource</span>'}[s]||'');
@@ -648,7 +646,7 @@ function renderPacks(){
       html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${mp.name?e(mp.name):'Unbekanntes Pack'}</div><div class="pkv" style="user-select:all">${e(mp.uuid)}</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div>${(mp.required_by&&mp.required_by.length)?`<div class="pkv" style="color:var(--text2);margin-top:2px">📎 Benötigt von: ${mp.required_by.map(n=>e(n)).join(', ')}</div>`:''}</div><span class="badge badge-r" style="flex-shrink:0">Fehlt</span><button class="icon-btn" title="Referenz entfernen" onclick="removeMissingRef('${e(world)}','${e(mp.uuid)}','${t}')">✕</button></div>`).join('');
     }
     if(!html){
-      html=`<div class="dim xs2" style="text-align:center;padding:18px">${world?'Keine Packs für diese Welt':'Keine Packs installiert'}</div>`;
+      html=`<div class="dim xs2" style="text-align:center;padding:18px">Keine Packs installiert</div>`;
     }
     el.innerHTML=html;
   });
