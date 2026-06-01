@@ -1406,12 +1406,9 @@ function rename_world(string $oldName, string $newName): array {
 // Erkennt ob ein Pack ein eingebautes Bedrock-Server-Pack ist (wird im Panel ausgeblendet)
 function is_builtin_bedrock_pack(string $folder, array $manifest = []): bool {
     $folderLower = strtolower(trim($folder));
-    $header      = $manifest['header'] ?? [];
-    $modules     = $manifest['modules'] ?? [];
-    $name        = strtolower(trim((string)($header['name'] ?? '')));
-    $description = strtolower(trim((string)($header['description'] ?? '')));
-    $uuid        = strtolower(trim((string)($header['uuid'] ?? '')));
+    $uuid        = strtolower(trim((string)(($manifest['header'] ?? [])['uuid'] ?? '')));
 
+    // Exakte Ordnernamen der Bedrock-Server-Standardpacks
     $builtinFolders = [
         'chemistry',
         'chemistry_behavior_pack',
@@ -1440,53 +1437,12 @@ function is_builtin_bedrock_pack(string $folder, array $manifest = []): bool {
 
     if (in_array($folderLower, $builtinFolders, true)) return true;
 
-    foreach ([
-        'vanilla',
-        'chemistry',
-        'editor',
-        'education',
-        'experimental',
-        'persona',
-        'development_',
-        'data_driven_',
-        'game_test',
-        'gametest',
-    ] as $part) {
-        if (str_starts_with($folderLower, $part) || str_contains($folderLower, $part)) return true;
-        if (str_contains($name, $part) || str_contains($description, $part)) return true;
+    // Ordnerpräfix-Prüfung (z.B. vanilla_1.21.x, chemistry_v2)
+    foreach (['vanilla_', 'chemistry_', 'editor_', 'education_', 'experimental_', 'persona_'] as $prefix) {
+        if (str_starts_with($folderLower, $prefix)) return true;
     }
 
-    foreach ([
-        'vanilla behavior pack',
-        'vanilla resource pack',
-        'chemistry behavior pack',
-        'chemistry resource pack',
-        'editor behavior pack',
-        'editor resource pack',
-        'education behavior pack',
-        'education resource pack',
-        'experimental behavior pack',
-        'experimental resource pack',
-        'game test framework',
-        'gametest framework',
-    ] as $part) {
-        if ($name === $part || str_contains($name, $part) || str_contains($description, $part)) return true;
-    }
-
-    // Mojang/Microsoft-Standardpacks haben sehr oft interne Beschreibungen/Modulnamen.
-    foreach ($modules as $module) {
-        $moduleDescription = strtolower(trim((string)($module['description'] ?? '')));
-        $moduleType        = strtolower(trim((string)($module['type'] ?? '')));
-        if (str_contains($moduleDescription, 'vanilla')) return true;
-        if (str_contains($moduleDescription, 'minecraft')) return true;
-        if (str_contains($moduleDescription, 'mojang')) return true;
-        if (str_contains($moduleDescription, 'editor')) return true;
-        if (str_contains($moduleDescription, 'education')) return true;
-        if (str_contains($moduleDescription, 'chemistry')) return true;
-        if ($moduleType === 'client_data' && str_contains($name, 'persona')) return true;
-    }
-
-    // Bekannte interne Bedrock/Mojang-Pack-UUIDs werden sicherheitshalber ausgeblendet.
+    // Bekannte interne Bedrock/Mojang-Pack-UUIDs
     $builtinUuids = [
         'b3b2d6f4-9f03-4d3f-a6f7-6d9c0b6f8f9f',
         '6f4b6893-1bb6-42fd-b458-7fa3d0c89616',
