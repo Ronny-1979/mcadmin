@@ -276,7 +276,7 @@ try {
         <div class="ch">
           <div class="ct">💻 Server-Konsole</div>
           <div class="fx ac g6">
-            <select id="con-lines" onchange="G.conLines=+this.value;startCon()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);cursor:pointer">
+            <select id="con-lines" onchange="G.conLines=+this.value;startCon()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text);cursor:pointer">
               <option value="50" selected>50 Zeilen</option>
               <option value="100">100 Zeilen</option>
               <option value="150">150 Zeilen</option>
