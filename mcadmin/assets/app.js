@@ -611,13 +611,13 @@ async function loadWorldsForPacks(){
   // Status aktuell halten damit active_world stimmt
   await refreshStatus();
   const sel=document.getElementById('pk-world');const worlds=await api('get_worlds');
-  sel.innerHTML='<option value="">-- Welt wählen --</option>'+worlds.map(w=>`<option value="${e(w.name)}" ${w.name===G.srv.active_world?'selected':''}>${e(w.name)}${w.missing_packs_count>0?' ⚠️':''}</option>`).join('');
-  if(G.srv.active_world)await loadWPacks();
+  sel.innerHTML='<option value="__all__">📦 Alle Packs anzeigen</option><option value="" disabled>──────────────</option>'+worlds.map(w=>`<option value="${e(w.name)}" ${w.name===G.srv.active_world?'selected':''}>${e(w.name)}${w.missing_packs_count>0?' ⚠️':''}</option>`).join('');
+  if(G.srv.active_world)await loadWPacks();else{G.wPacks={behavior:[],resource:[]};renderPacks();}
 }
 // Lädt alle installierten Behavior- und Resource-Packs und rendert sie
 async function loadAllPacks(){G.packs=await api('get_packs');renderPacks();}
 // Lädt die aktiven Packs der gewählten Welt (inkl. fehlende Packs) und rendert sie
-async function loadWPacks(){const w=document.getElementById('pk-world').value;if(!w)return;G.wPacks=await api('get_world_packs',{world:w});renderPacks();}
+async function loadWPacks(){const w=document.getElementById('pk-world').value;if(!w||w==='__all__'){G.wPacks={behavior:[],resource:[]};renderPacks();return;}G.wPacks=await api('get_world_packs',{world:w});renderPacks();}
 // Rendert die Pack-Listen: alle installierten Packs anzeigen, Toggle je nach Welt aktiv/inaktiv
 function renderPacks(){
   const world=document.getElementById('pk-world').value;
@@ -627,7 +627,8 @@ function renderPacks(){
     const missing=G.wPacks[t+'_missing']||[];
     const el=document.getElementById((t==='resource'?'res':'beh')+'-list');
 
-    const packs=allPacks;
+    const showAll=!world||world==='__all__';
+    const packs=showAll?allPacks:allPacks.filter(p=>(p.used_by_worlds||[]).includes(world)||(p.imported_by_worlds||[]).includes(world));
     const worldBadges=p=>{const ws=[...(p.used_by_worlds||[]),...(p.imported_by_worlds||[])];const u=[...new Set(ws)];return u.length?`<div class="pkv" style="margin-top:2px">${u.map(w=>`<span class="badge badge-g" style="font-size:9px;margin-right:3px">${e(w)}</span>`).join('')}</div>`:''};
 
     const subtypeBadge=s=>({script:'<span class="badge badge-o">Script</span>',data:'<span class="badge badge-d">Behavior</span>',resources:'<span class="badge badge-b">Resource</span>'}[s]||'');
@@ -637,16 +638,16 @@ function renderPacks(){
     if(packs.length){
       html+=packs.map(p=>{
         const en=active.some(a=>{const id=typeof a==='string'?a:(a.pack_id??a.uuid);return id===p.uuid&&(a.enabled!==false);});
-        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${!world?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
+        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${showAll?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
       }).join('');
     }
-    // Fehlende Packs (UUID vorhanden, aber nicht installiert)
-    if(missing.length){
+    // Fehlende Packs (UUID vorhanden, aber nicht installiert) — nur bei Weltauswahl
+    if(!showAll&&missing.length){
       html+=`<div style="margin-top:8px;padding:4px 2px;font-size:11px;color:var(--text2)">Fehlende Packs — nicht auf diesem Server installiert:</div>`;
       html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${mp.name?e(mp.name):'Unbekanntes Pack'}</div><div class="pkv" style="user-select:all">${e(mp.uuid)}</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div>${(mp.required_by&&mp.required_by.length)?`<div class="pkv" style="color:var(--text2);margin-top:2px">📎 Benötigt von: ${mp.required_by.map(n=>e(n)).join(', ')}</div>`:''}</div><span class="badge badge-r" style="flex-shrink:0">Fehlt</span><button class="icon-btn" title="Referenz entfernen" onclick="removeMissingRef('${e(world)}','${e(mp.uuid)}','${t}')">✕</button></div>`).join('');
     }
     if(!html){
-      html=`<div class="dim xs2" style="text-align:center;padding:18px">Keine Packs installiert</div>`;
+      html=`<div class="dim xs2" style="text-align:center;padding:18px">${showAll?'Keine Packs installiert':'Keine Packs für diese Welt'}</div>`;
     }
     el.innerHTML=html;
   });
