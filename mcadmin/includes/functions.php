@@ -896,6 +896,32 @@ if (file_exists($destLevelDat)) {
         'resource' => $packUuids['resource_imported'] ?? [],
     ];
 
+    // Pack-Namens-Cache aus History-Dateien und gebündelten Manifesten aufbauen.
+    // Ermöglicht spätere Namensanzeige auch wenn ein Pack nicht (mehr) installiert ist.
+    $nameHints = $state['world_packs_name_cache'][$worldName] ?? [];
+    foreach (['world_behavior_pack_history.json', 'world_resource_pack_history.json'] as $hf) {
+        $hp = $worldRoot . '/' . $hf;
+        if (!file_exists($hp)) continue;
+        $hd = json_decode((string)file_get_contents($hp), true) ?? [];
+        foreach ($hd['packs'] ?? [] as $pack) {
+            $hu = strtolower($pack['uuid'] ?? '');
+            if ($hu !== '' && !empty($pack['name'])) $nameHints[$hu] = $pack['name'];
+        }
+    }
+    foreach (['behavior_packs', 'resource_packs'] as $pdir) {
+        $psrc = $worldRoot . '/' . $pdir;
+        if (!is_dir($psrc)) continue;
+        foreach (array_diff((array)@scandir($psrc), ['.', '..']) as $pe) {
+            $pmf = $psrc . '/' . $pe . '/manifest.json';
+            if (!file_exists($pmf)) continue;
+            $pd = json_decode((string)file_get_contents($pmf), true) ?? [];
+            $pu = strtolower($pd['header']['uuid'] ?? '');
+            $pn = $pd['header']['name'] ?? '';
+            if ($pu !== '' && $pn !== '') $nameHints[$pu] = $pn;
+        }
+    }
+    if ($nameHints) $state['world_packs_name_cache'][$worldName] = $nameHints;
+
     // Importierte Welt NICHT automatisch als aktive Welt setzen.
     // Wichtig:
     // - Der Server wird NICHT gestartet.
@@ -1841,6 +1867,12 @@ function find_pack_name_in_history(string $worldName, string $uuid): ?string {
     return null;
 }
 
+// Sucht einen Pack-Namen im beim Import gespeicherten Name-Cache des States.
+function find_pack_name_in_state_cache(string $worldName, string $uuid): ?string {
+    $cache = get_state()['world_packs_name_cache'][$worldName] ?? [];
+    return $cache[strtolower($uuid)] ?? null;
+}
+
 // Sucht welche installierten Packs die gegebene UUID als Abhängigkeit listen.
 // Gibt Array mit Pack-Namen zurück (leer wenn keiner gefunden).
 function find_packs_requiring_uuid(string $uuid): array {
@@ -1875,11 +1907,15 @@ function get_world_packs(string $worldName): array {
             if (!$inst && $normRef['version'] === null) {
                 $inst = find_installed_pack($pt, $normRef['pack_id']);
             }
+            $resolvedName = $inst ? ($inst['name'] ?? 'Unbekannt')
+                                  : (find_pack_name_anywhere($pt, $normRef['pack_id'])
+                                     ?? find_pack_name_in_history($worldName, $normRef['pack_id'])
+                                     ?? find_pack_name_in_state_cache($worldName, $normRef['pack_id'])
+                                     ?? 'Unbekannt');
             $resolved[] = [
                 'uuid'    => $normRef['pack_id'],
                 'version' => $normRef['version'] ? implode('.', $normRef['version']) : '?',
-                'name'    => $inst ? ($inst['name'] ?? 'Unbekannt')
-                                   : (find_pack_name_anywhere($pt, $normRef['pack_id']) ?? 'Unbekannt'),
+                'name'    => $resolvedName,
                 'enabled' => $enabled,
             ];
             if (!$inst && $enabled) {
@@ -1887,7 +1923,8 @@ function get_world_packs(string $worldName): array {
                     'uuid'        => $normRef['pack_id'],
                     'version'     => $normRef['version'] ? implode('.', $normRef['version']) : '?',
                     'name'        => find_pack_name_anywhere($pt, $normRef['pack_id'])
-                                     ?? find_pack_name_in_history($worldName, $normRef['pack_id']),
+                                     ?? find_pack_name_in_history($worldName, $normRef['pack_id'])
+                                     ?? find_pack_name_in_state_cache($worldName, $normRef['pack_id']),
                     'required_by' => find_packs_requiring_uuid($normRef['pack_id']),
                 ];
             }
