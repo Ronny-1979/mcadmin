@@ -1777,8 +1777,10 @@ function get_pack_world_usage(string $type, string $uuid, $version = null): arra
     ];
 }
 
-// Gibt alle installierten Behavior- oder Resource-Packs zurück (eingebaute Packs ausgeblendet)
-function get_installed_packs(string $type = 'behavior'): array {
+// Gibt alle installierten Behavior- oder Resource-Packs zurück.
+// $userOnly=true: nur vom Panel installierte Packs (für UI-Anzeige).
+// $userOnly=false: alle Packs inkl. Bedrock-Systempacks (für interne Lookups).
+function get_installed_packs(string $type = 'behavior', bool $userOnly = false): array {
     $dir = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
     if (!is_dir($dir)) return [];
 
@@ -1793,9 +1795,13 @@ function get_installed_packs(string $type = 'behavior'): array {
         if (is_dir($path) && file_exists($manifest)) {
             $data = json_decode(file_get_contents($manifest), true) ?: [];
 
-            // Standardpacks aus der Bedrock-Server-ZIP ausblenden,
-            // eigene/importierte Packs aber anzeigen.
-            if (!is_mcadmin_user_pack($path) && is_builtin_bedrock_pack($d, $data)) continue;
+            if ($userOnly) {
+                // UI-Anzeige: nur vom Panel selbst installierte Packs zeigen
+                if (!is_mcadmin_user_pack($path)) continue;
+            } else {
+                // Interne Lookups: nur bekannte Bedrock-Systempacks ausblenden
+                if (!is_mcadmin_user_pack($path) && is_builtin_bedrock_pack($d, $data)) continue;
+            }
 
             $header = $data['header'] ?? [];
             $uuid = $header['uuid'] ?? $d;
