@@ -217,7 +217,7 @@ try {
                 // damit sie beim Weltlöschen automatisch mit aufgeräumt werden.
                 foreach ($r['installed'] ?? [] as $pack) {
                     if (!empty($pack['uuid'])) {
-                        track_pack_imported_for_world($world, $pack['uuid'], $pack['type'], $pack['version'] ?? '0.0.0');
+                        track_pack_imported_for_world($world, $pack['uuid'], $pack['type'], $pack['version'] ?? [0,0,0], $pack['folder'] ?? '');
                     }
                 }
                 echo json_encode(['success'=>true,'message'=>"$resolved fehlendes Pack(s) erfolgreich installiert und verknüpft"]);
