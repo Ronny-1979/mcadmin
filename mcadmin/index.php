@@ -218,6 +218,26 @@ try {
   </div>
 </div>
 
+<div id="modal-world-compat" class="modal-bg hidden">
+  <div class="modal">
+    <div class="mh" style="color:var(--yellow,#f59e0b)">⚠️ Versions-Kompatibilität</div>
+    <div id="compat-issues-section">
+      <div style="margin:8px 0 4px;font-weight:600;font-size:.9rem">Inkompatible Packs:</div>
+      <ul id="compat-issues-list" style="margin:4px 0 12px;padding-left:18px;line-height:1.7;font-size:.85rem"></ul>
+    </div>
+    <div id="compat-exp-section">
+      <div style="margin:8px 0 4px;font-weight:600;font-size:.9rem">Aktive Experimente in dieser Welt:</div>
+      <ul id="compat-exp-list" style="margin:4px 0 12px;padding-left:18px;line-height:1.7;font-size:.85rem"></ul>
+      <div class="dim xs2" style="margin-bottom:8px">Experimente können sich je nach BDS-Version unterschiedlich verhalten (z.B. holiday_creator_features ab 1.21.20).</div>
+    </div>
+    <div class="dim xs2" style="margin-bottom:16px">Die Welt könnte sich anders verhalten oder Inhalte könnten nicht funktionieren.</div>
+    <div class="mf">
+      <button class="btn ghost sm" onclick="closeModal('modal-world-compat');pendingWorldFile=null;">Abbrechen</button>
+      <button class="btn warn sm" onclick="forceInstallWorld()">Trotzdem installieren</button>
+    </div>
+  </div>
+</div>
+
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
   <nav class="sidebar" id="sidebar">

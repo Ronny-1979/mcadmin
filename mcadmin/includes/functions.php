@@ -126,6 +126,40 @@ function get_server_version(): string {
     return $m[1] ?? 'unbekannt';
 }
 
+// Prüft eingebettete Pack-Manifeste und Experiment-Flags der Welt auf BDS-Versions-Kompatibilität
+function check_world_compat_issues(string $worldRoot, string $bdVersion): array {
+    $bdParts = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
+    $issues  = [];
+    foreach (['behavior_packs', 'resource_packs'] as $packDir) {
+        $base = $worldRoot . '/' . $packDir;
+        if (!is_dir($base)) continue;
+        foreach (array_diff((array)@scandir($base), ['.', '..']) as $pack) {
+            $manifest = $base . '/' . $pack . '/manifest.json';
+            if (!file_exists($manifest)) continue;
+            $data   = json_decode((string)file_get_contents($manifest), true);
+            $minVer = $data['header']['min_engine_version'] ?? null;
+            if (!is_array($minVer) || count($minVer) < 2) continue;
+            $minParts = array_map('intval', array_slice($minVer, 0, 3));
+            foreach ([0, 1, 2] as $i) {
+                $bd  = $bdParts[$i]  ?? 0;
+                $min = $minParts[$i] ?? 0;
+                if ($min > $bd) {
+                    $issues[] = [
+                        'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
+                        'pack'      => $data['header']['name'] ?? $pack,
+                        'requires'  => implode('.', $minParts),
+                        'installed' => implode('.', $bdParts),
+                    ];
+                    break;
+                }
+                if ($bd > $min) break;
+            }
+        }
+    }
+    $experiments = get_world_experiments($worldRoot);
+    return ['issues' => $issues, 'experiments' => $experiments];
+}
+
 // ============================================================
 // DISCORD WEBHOOK
 // ============================================================
@@ -585,7 +619,7 @@ PYEOF;
 }
 
 // Importiert eine .mcworld-Datei: entpackt, validiert, kopiert Packs und legt die Welt an
-function install_world(string $tmpPath, string $originalName): array {
+function install_world(string $tmpPath, string $originalName, bool $force = false): array {
     if (strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) !== 'mcworld') {
         return ['success' => false, 'message' => 'Nur .mcworld-Dateien erlaubt'];
     }
@@ -619,6 +653,21 @@ function install_world(string $tmpPath, string $originalName): array {
         return ['success' => false, 'message' => $isJava
             ? 'Java Edition erkannt — dieser Server nutzt Bedrock Edition. Java-Welten sind nicht kompatibel.'
             : 'Kein gültiges Bedrock-World (kein db/-Verzeichnis gefunden)'];
+    }
+
+    if (!$force) {
+        $bdVer  = get_server_version();
+        $compat = check_world_compat_issues($worldRoot, $bdVer);
+        if (!empty($compat['issues']) || !empty($compat['experiments'])) {
+            exec('rm -rf ' . escapeshellarg($tmpDir));
+            return [
+                'success'               => false,
+                'compatibility_warning' => true,
+                'issues'                => $compat['issues'],
+                'experiments'           => $compat['experiments'],
+                'message'               => 'Mögliche Versions-Kompatibilitätsprobleme gefunden.',
+            ];
+        }
     }
 	
 
