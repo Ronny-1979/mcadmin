@@ -247,8 +247,54 @@ try {
                 }
                 echo json_encode(['success'=>true,'message'=>"$resolved fehlendes Pack(s) erfolgreich installiert und verknüpft"]);
             } else {
-                echo json_encode(['success'=>false,'message'=>'Pack installiert, aber UUID stimmt mit keinem fehlenden Pack überein']);
+                // UUID-Match trotz Versions-Abweichung prüfen
+                $vmMatches = [];
+                foreach ($r['installed'] ?? [] as $newPack) {
+                    foreach ([
+                        'behavior' => $before['behavior_missing'] ?? [],
+                        'resource' => $before['resource_missing'] ?? [],
+                    ] as $pt => $missList) {
+                        foreach ($missList as $mp) {
+                            if (strtolower($mp['uuid']) === strtolower($newPack['uuid'])) {
+                                $vmMatches[] = [
+                                    'uuid'        => $newPack['uuid'],
+                                    'type'        => $pt,
+                                    'old_version' => $mp['version'],
+                                    'new_version' => implode('.', (array)$newPack['version']),
+                                ];
+                            }
+                        }
+                    }
+                }
+                if (!empty($vmMatches)) {
+                    echo json_encode(['success'=>false,'version_mismatch'=>true,'matches'=>$vmMatches,'message'=>'Pack installiert, aber Versions-Referenz weicht ab.']);
+                } else {
+                    echo json_encode(['success'=>false,'message'=>'Pack installiert, aber UUID stimmt mit keinem fehlenden Pack überein']);
+                }
             }
+            break;
+        case 'fix_pack_version_refs':  // Aktualisiert Versions-Referenzen im State auf installierte Version
+            $world = $_POST['world'] ?? '';
+            $refs  = json_decode($_POST['refs'] ?? '[]', true);
+            if (!$world || !is_array($refs)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültige Parameter']); break;
+            }
+            $fixed = 0;
+            foreach ($refs as $ref) {
+                $ru = $ref['uuid'] ?? '';
+                $rt = $ref['type'] ?? '';
+                if ($ru && in_array($rt, ['behavior','resource'],true)) {
+                    if (update_pack_ref_version($world, $ru, $rt)) $fixed++;
+                }
+            }
+            // Für Welt-Cleanup tracken
+            foreach ($refs as $ref) {
+                $inst = find_installed_pack($ref['type']??'resource', $ref['uuid']??'');
+                if ($inst && !empty($inst['uuid'])) {
+                    track_pack_imported_for_world($world, $inst['uuid'], $inst['type'], $inst['version']??[0,0,0], $inst['folder']??'');
+                }
+            }
+            echo json_encode(['success'=>$fixed>0,'message'=>"$fixed Versions-Referenz(en) aktualisiert"]);
             break;
 
         // ── BACKUPS ───────────────────────────────────────────

@@ -514,13 +514,32 @@ async function supplyMissingPack(worldName,inp,expectedUuid=''){
   try{
     const params={world:worldName};if(expectedUuid)params.expected_uuid=expectedUuid;
     const r=await api('supply_missing_pack',params,{pack:f});
-    toast(r.message||(r.success?'Installiert':'Fehler'),r.success?'success':'error');
-    if(r.success){loadWorlds();await loadWPacks();}
-    else if(st)st.innerHTML=`<div class="xs2" style="margin-top:8px;color:var(--red)">${e(r.message)}</div>`;
+    if(r.success){
+      toast(r.message||'Installiert','success');
+      loadWorlds();await loadWPacks();
+    } else if(r.version_mismatch&&r.matches?.length){
+      const details=r.matches.map(m=>`v${m.old_version} → v${m.new_version}`).join(', ');
+      const msg=`Pack installiert, aber Versions-Referenz weicht ab (${details}).`;
+      if(st){
+        st.innerHTML=`<div class="xs2" style="margin-top:8px;color:var(--yellow)">⚠️ ${e(msg)} <button class="btn primary xs" onclick="fixPackVersionRefs('${e(worldName)}',${JSON.stringify(r.matches)},this)">Referenz aktualisieren</button></div>`;
+      } else {
+        if(confirm(msg+'\nWelt-Referenz jetzt aktualisieren?')) await fixPackVersionRefs(worldName,r.matches,null);
+      }
+    } else {
+      toast(r.message||'Fehler','error');
+      if(st)st.innerHTML=`<div class="xs2" style="margin-top:8px;color:var(--red)">${e(r.message)}</div>`;
+    }
   }catch(err){
     if(st)st.innerHTML='<div class="xs2" style="margin-top:8px;color:var(--red)">❌ Upload fehlgeschlagen</div>';
   }
   inp.value='';
+}
+// Aktualisiert Versions-Referenzen im State auf die installierten Versionen
+async function fixPackVersionRefs(worldName,matches,btn){
+  if(btn)btn.disabled=true;
+  const r=await api('fix_pack_version_refs',{world:worldName,refs:JSON.stringify(matches)});
+  toast(r.message||(r.success?'Aktualisiert':'Fehler'),r.success?'success':'error');
+  if(r.success){loadWorlds();await loadWPacks();}
 }
 // Wechselt zur gewählten Welt nach Bestätigung und bietet Server-Neustart an
 async function switchW(name){
