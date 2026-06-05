@@ -110,7 +110,8 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Upload fehlgeschlagen: ' . ($errCodes[$code] ?? "Fehler $code")]); break;
             }
             try {
-                echo json_encode(install_world($_FILES['world']['tmp_name'], $_FILES['world']['name']));
+                $force = !empty($_POST['force']);
+                echo json_encode(install_world($_FILES['world']['tmp_name'], $_FILES['world']['name'], $force));
             } catch (Throwable $ex) {
                 error_log('[mcadmin] ' . $ex->getMessage() . ' in ' . $ex->getFile() . ':' . $ex->getLine());
                 echo json_encode(['success' => false, 'message' => 'Interner Fehler beim Importieren der Welt.']);
