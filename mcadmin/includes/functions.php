@@ -1815,7 +1815,7 @@ function get_installed_packs(string $type = 'behavior'): array {
             $packs[] = [
                 'folder'              => $d,
                 'uuid'                => $uuid,
-                'name'                => $header['name'] ?? $d,
+                'name'                => resolve_pack_name($path, $header['name'] ?? $d),
                 'description'         => $header['description'] ?? '',
                 'version'             => $versionStr,
                 'version_arr'         => $versionArr,
@@ -1832,6 +1832,27 @@ function get_installed_packs(string $type = 'behavior'): array {
     return $packs;
 }
 
+// Löst einen Übersetzungs-Key im Pack-Namen auf (z.B. "pack.name" oder "%pack.name%").
+// Liest den echten Namen aus der Pack-Sprachdatei texts/en_US.lang o.ä.
+function resolve_pack_name(string $packPath, string $rawName): string {
+    $key = trim($rawName, '%');
+    // Kein Übersetzungs-Key: enthält Leerzeichen oder keinen Punkt
+    if ($key === $rawName && (strpos($key, ' ') !== false || strpos($key, '.') === false)) {
+        return $rawName;
+    }
+    foreach (['texts/en_US.lang', 'texts/en_us.lang', 'texts/en_GB.lang', 'texts/en_gb.lang'] as $lf) {
+        $lp = $packPath . '/' . $lf;
+        if (!file_exists($lp)) continue;
+        foreach (file($lp, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            if (strncmp($line, $key . '=', strlen($key) + 1) === 0) {
+                $val = trim(substr($line, strlen($key) + 1));
+                if ($val !== '') return $val;
+            }
+        }
+    }
+    return $rawName;
+}
+
 // Sucht einen Pack-Namen anhand der UUID in ALLEN Pack-Verzeichnissen (inkl. Bedrock-Systempacks).
 // Gibt null zurück wenn nichts gefunden wurde.
 function find_pack_name_anywhere(string $type, string $uuid): ?string {
@@ -1844,7 +1865,8 @@ function find_pack_name_anywhere(string $type, string $uuid): ?string {
         if (!is_dir($path) || !file_exists($manifest)) continue;
         $data = json_decode(file_get_contents($manifest), true) ?: [];
         if (strtolower($data['header']['uuid'] ?? '') === strtolower($uuid)) {
-            return $data['header']['name'] ?? null;
+            $rawName = $data['header']['name'] ?? null;
+            return $rawName !== null ? resolve_pack_name($path, $rawName) : null;
         }
     }
     return null;
