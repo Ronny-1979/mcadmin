@@ -14,9 +14,13 @@ async function api(action,data={},files={}){
   const fd=new FormData();fd.append('action',action);
   for(const[k,v]of Object.entries(data))fd.append(k,v);
   for(const[k,v]of Object.entries(files))fd.append(k,v);
-  const r=await fetch('api/handler.php',{method:'POST',body:fd});
-  if(!r.ok)throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const ctrl=new AbortController();
+  const tid=setTimeout(function(){ctrl.abort();},60000);
+  try{
+    const r=await fetch('api/handler.php',{method:'POST',body:fd,signal:ctrl.signal});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }finally{clearTimeout(tid);}
 }
 
 
@@ -200,7 +204,7 @@ async function pollCon(){
         });
         if(atB)out.scrollTop=out.scrollHeight;
       }
-    }catch(e){}
+    }catch(e){console.debug('[mcadmin pollCon]',e);}
   }
   if(G.conActive)G.conTimer=setTimeout(pollCon,2500);
 }
@@ -219,13 +223,16 @@ function quickCmd(cmd){document.getElementById('con-inp').value=cmd;conSend();}
 // Liest den Konsoleneingabe-Inhalt, speichert ihn im Verlauf und sendet den Befehl
 async function conSend(){
   const inp=document.getElementById('con-inp');const cmd=inp.value.trim();if(!cmd)return;
-  G.conHist.unshift(cmd);G.conHistIdx=-1;inp.value='';
+  G.conHist.unshift(cmd);if(G.conHist.length>50)G.conHist.length=50;G.conHistIdx=-1;inp.value='';
+  try{localStorage.setItem('mcadmin_conHist',JSON.stringify(G.conHist));}catch(e){}
   const out=document.getElementById('con-out');
   const el=document.createElement('span');el.className='cl cl-cmd';el.textContent='> '+cmd;out.appendChild(el);out.scrollTop=out.scrollHeight;
   const r=await api('console_send',{cmd});
   if(!r.success)toast(r.message||'Befehl konnte nicht gesendet werden','warn');
 }
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',function(){
+  // Konsolen-Verlauf aus localStorage laden
+  try{G.conHist=JSON.parse(localStorage.getItem('mcadmin_conHist')||'[]');}catch(e){}
   const inp=document.getElementById('con-inp');
   if(inp){
     inp.addEventListener('keydown',ev=>{
@@ -234,6 +241,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
     inp.addEventListener('input',()=>{G.conHistIdx=-1;});
   }
+  // Enter-Taste in Welt-Modals
+  ['cw-name','cw-seed'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('keydown',function(ev){if(ev.key==='Enter')createWorld();});});
+  var rwNew=document.getElementById('rw-new');if(rwNew)rwNew.addEventListener('keydown',function(ev){if(ev.key==='Enter')renameWorld();});
   startCon();
   window.addEventListener('resize',resizeCon);
 });
@@ -313,7 +323,8 @@ async function loadBk(){
 let bkTimer=null;
 // Startet ein asynchrones Backup und zeigt die Fortschrittsanzeige
 async function createBackup(){
-  const label=document.getElementById('bk-label').value;
+  const label=document.getElementById('bk-label').value.trim();
+  if(label.length>32){toast('Label darf max. 32 Zeichen haben','warn');return;}
   const btn=document.getElementById('btn-bk-create');
   if(btn){btn.disabled=true;btn.innerHTML='⏳ Läuft...';}
   const r=await api('start_backup',{label});
@@ -522,10 +533,16 @@ async function createWorld(){
   toast(r.message,r.success?'success':'error');
   if(r.success){closeModal('modal-create-world');document.getElementById('cw-name').value='';document.getElementById('cw-seed').value='';loadWorlds();}
 }
-// Löscht eine Welt nach doppelter Bestätigung
-async function delWorld(name){
-  if(!confirm(`Welt "${name}" UNWIDERRUFLICH löschen?`))return;
-  if(!confirm(`Wirklich? Alle Daten gehen verloren!`))return;
+// Öffnet Bestätigungs-Modal zum Löschen einer Welt
+function delWorld(name){
+  document.getElementById('del-world-name').textContent=name;
+  document.getElementById('modal-del-world').dataset.world=name;
+  openModal('modal-del-world');
+}
+// Führt das Löschen der Welt nach Modal-Bestätigung durch
+async function confirmDelWorld(){
+  var name=document.getElementById('modal-del-world').dataset.world;
+  closeModal('modal-del-world');
   const r=await api('delete_world',{world:name});toast(r.message,r.success?'success':'error');if(r.success)loadWorlds();
 }
 // Öffnet das Umbenennen-Modal und befüllt es mit dem aktuellen Weltnamen
