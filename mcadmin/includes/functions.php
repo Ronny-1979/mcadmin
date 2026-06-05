@@ -2121,6 +2121,21 @@ function install_pack(string $tmpPath, string $originalName): array {
     return ['success' => true, 'message' => $msg, 'installed' => $results];
 }
 
+// Merkt ein Pack als "für diese Welt importiert" im State, damit es beim Weltlöschen aufgeräumt wird.
+function track_pack_imported_for_world(string $worldName, string $uuid, string $type, $version): void {
+    $state = get_state();
+    if (!isset($state['world_imported_packs'][$worldName])) {
+        $state['world_imported_packs'][$worldName] = ['behavior' => [], 'resource' => []];
+    }
+    $list = &$state['world_imported_packs'][$worldName][$type];
+    foreach ($list as $entry) {
+        $ref = normalize_pack_ref($entry);
+        if ($ref && strtolower($ref['pack_id']) === strtolower($uuid)) return; // bereits eingetragen
+    }
+    $list[] = ['pack_id' => $uuid, 'version' => pack_version_array($version)];
+    save_state($state);
+}
+
 // Installiert ein Pack und aktiviert es sofort für eine bestimmte Welt
 function install_pack_for_world(string $tmpPath, string $originalName, string $worldName): array {
     $r = install_pack($tmpPath, $originalName);
@@ -2129,6 +2144,7 @@ function install_pack_for_world(string $tmpPath, string $originalName, string $w
     foreach ($r['installed'] as $pack) {
         if (!empty($pack['uuid']) && toggle_pack_for_world($worldName, $pack['uuid'], $pack['type'], true)) {
             $activated++;
+            track_pack_imported_for_world($worldName, $pack['uuid'], $pack['type'], $pack['version'] ?? '0.0.0');
         }
     }
     if ($activated > 0) apply_world_packs($worldName);
