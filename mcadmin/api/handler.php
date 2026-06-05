@@ -196,6 +196,17 @@ try {
                 echo json_encode(['success'=>false,'message'=>'Ungültige Parameter']); break;
             }
             echo json_encode(delete_pack($uuid, $type)); break;
+        case 'replace_pack':    // Ersetzt ein installiertes Pack durch neue Version, aktualisiert Welt-Referenzen
+            $oldUuid = strtolower($_POST['old_uuid'] ?? '');
+            $oldType = $_POST['old_type'] ?? '';
+            if (!$oldUuid || !in_array($oldType, ['behavior', 'resource'], true)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültige Parameter']); break;
+            }
+            if (!isset($_FILES['pack']) || $_FILES['pack']['error'] !== UPLOAD_ERR_OK) {
+                echo json_encode(['success'=>false,'message'=>'Upload fehlgeschlagen']); break;
+            }
+            echo json_encode(replace_pack($oldUuid, $oldType, $_FILES['pack']['tmp_name'], $_FILES['pack']['name']));
+            break;
         case 'supply_missing_pack':  // Installiert fehlendes Pack und repariert die Welt-Referenz
             $world = $_POST['world'] ?? '';
             if (!$world || !preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world)) {
@@ -210,6 +221,18 @@ try {
             if (!$r['success']) { echo json_encode($r); break; }
             get_installed_packs('behavior', false, true);
             get_installed_packs('resource', false, true);
+            // Wenn eine bestimmte UUID erwartet wird, sofort prüfen ob das hochgeladene Pack passt
+            $expectedUuid = strtolower($_POST['expected_uuid'] ?? '');
+            if ($expectedUuid !== '') {
+                $matched = false;
+                foreach ($r['installed'] ?? [] as $pack) {
+                    if (strtolower($pack['uuid']) === $expectedUuid) { $matched = true; break; }
+                }
+                if (!$matched) {
+                    echo json_encode(['success'=>false,'message'=>'Falsches Pack: UUID stimmt nicht überein (erwartet: ' . substr($expectedUuid, 0, 8) . '...)']);
+                    break;
+                }
+            }
             apply_world_packs($world);
             $after = get_world_packs($world);
             $missAfter = count($after['behavior_missing']??[]) + count($after['resource_missing']??[]);

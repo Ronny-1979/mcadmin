@@ -2271,6 +2271,55 @@ function delete_pack(string $uuid, string $type): array {
     return ['success' => true, 'message' => 'Pack gelöscht'];
 }
 
+// Ersetzt ein installiertes Pack durch eine neue Version und aktualisiert alle Welt-Referenzen
+function replace_pack(string $oldUuid, string $oldType, string $tmpPath, string $originalName): array {
+    // Betroffene Welten VOR der Installation ermitteln
+    $usage    = get_pack_world_usage($oldType, $oldUuid);
+    $affected = $usage['used_by_worlds'];
+
+    $r = install_pack($tmpPath, $originalName);
+    if (!$r['success']) return $r;
+
+    get_installed_packs('behavior', false, true);
+    get_installed_packs('resource', false, true);
+
+    // Neues Pack ermitteln — gleicher Typ bevorzugt
+    $newPack = null;
+    foreach ($r['installed'] ?? [] as $p) {
+        if ($p['type'] === $oldType) { $newPack = $p; break; }
+    }
+    if (!$newPack) $newPack = $r['installed'][0] ?? null;
+    if (!$newPack) return ['success' => false, 'message' => 'Kein gültiges Pack im Upload gefunden'];
+
+    $newUuid = $newPack['uuid'];
+    $newType = $newPack['type'];
+
+    foreach ($affected as $world) {
+        toggle_pack_for_world($world, $oldUuid, $oldType, false);
+        toggle_pack_for_world($world, $newUuid, $newType, true);
+        apply_world_packs($world);
+    }
+
+    // Alten Pack-Ordner entfernen wenn UUID sich geändert hat
+    if (strtolower($newUuid) !== strtolower($oldUuid)) {
+        $dir = $oldType === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
+        foreach (array_diff((array)@scandir($dir), ['.', '..']) as $d) {
+            $p = $dir . '/' . $d;
+            if (!is_dir($p)) continue;
+            $mf = json_decode((string)@file_get_contents($p . '/manifest.json'), true) ?? [];
+            if (strtolower($mf['header']['uuid'] ?? '') === strtolower($oldUuid)) {
+                exec('rm -rf ' . escapeshellarg($p));
+                break;
+            }
+        }
+    }
+
+    $cnt = count($affected);
+    $msg = "{$newPack['name']} aktualisiert";
+    if ($cnt > 0) $msg .= " · $cnt Welt(en) angepasst";
+    return ['success' => true, 'message' => $msg, 'affected_worlds' => $cnt];
+}
+
 // Durchsucht ein Verzeichnis rekursiv und installiert gefundene Packs (anhand manifest.json)
 function install_pack_dir(string $dir, array &$results): void {
     $manifest = $dir . '/manifest.json';
