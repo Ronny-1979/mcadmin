@@ -207,6 +207,17 @@ try {
   </div>
 </div>
 
+<div id="modal-del-world" class="modal-bg hidden">
+  <div class="modal">
+    <div class="mh" style="color:var(--red,#ef4444)">Welt löschen</div>
+    <div style="margin:12px 0 16px;line-height:1.6">Welt <strong id="del-world-name"></strong> unwiderruflich löschen?<br><span class="dim xs2">Alle Welt-Daten gehen verloren. Diese Aktion kann nicht rückgängig gemacht werden.</span></div>
+    <div class="mf">
+      <button class="btn ghost sm" onclick="closeModal('modal-del-world')">Abbrechen</button>
+      <button class="btn danger sm" onclick="confirmDelWorld()">🗑 Löschen</button>
+    </div>
+  </div>
+</div>
+
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
   <nav class="sidebar" id="sidebar">
