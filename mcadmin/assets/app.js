@@ -252,7 +252,7 @@ async function checkVer(){
     if(ub)ub.style.display='';
     if(btn){
       if(!inst.installed){btn.disabled=false;btn.textContent=`⬇ Bedrock ${e(info.latest)} installieren`;btn.className='btn success';if(ub)ub.innerHTML=`<div class="ub good" style="margin:0"><div>📦</div><div><strong class="tg">Noch nicht installiert</strong><br><span class="dim xs2">Version ${e(info.latest)} wird von Mojang heruntergeladen.</span></div></div>`;}
-      else if(info.update_available){btn.disabled=false;btn.textContent=`⬆ Update auf ${e(info.latest)}`;btn.className='btn warn';if(ub)ub.innerHTML=`<div class="ub" style="margin:0"><div>🔔</div><div><strong>Update verfügbar!</strong><br><span class="dim xs2">Backup wird vor dem Update automatisch erstellt.</span></div></div>`;}
+      else if(info.update_available){btn.disabled=false;btn.textContent='⬆ Minecraft aktualisieren';btn.className='btn warn';if(ub)ub.innerHTML=`<div class="ub" style="margin:0"><div>🔔</div><div><strong>Update verfügbar!</strong><br><span class="dim xs2">Backup wird vor dem Update automatisch erstellt.</span></div></div>`;}
       else{btn.disabled=true;btn.textContent='✓ Aktuell';btn.className='btn ghost';if(ub)ub.innerHTML=`<div class="ub good" style="margin:0"><div>✅</div><div><strong class="tg">Aktuell!</strong> Neueste Version installiert.</div></div>`;}
     }
     updateSidebarVer();
@@ -783,9 +783,10 @@ async function checkPanelUpdate(force){
       ubHtml=`<div class="ub warn2" style="margin:0"><div>⚠️</div><div>Update-Skript fehlt. Einmalig über die Shell ausführen:<br><code style="font-size:11px;word-break:break-all">curl -fsSL https://raw.githubusercontent.com/Ronny-1979/mcadmin/main/install.sh | sudo bash -s -- --update</code></div></div>`;
     }else if(r.update_available){
       ubHtml=`<div class="ub" style="margin:0"><div>🔔</div><div><strong>Update verfügbar!</strong> Aktuelle Konfiguration und Passwörter bleiben erhalten.</div></div>`;
-      if(btn)btn.disabled=false;
+      if(btn){btn.disabled=false;btn.textContent='⬆ Panel aktualisieren';btn.className='btn warn';}
     }else{
       ubHtml=`<div class="ub good" style="margin:0"><div>✅</div><div><strong class="tg">Aktuell!</strong> Panel ist auf dem neuesten Stand.</div></div>`;
+      if(btn){btn.disabled=true;btn.textContent='✓ Aktuell';btn.className='btn ghost';}
     }
     if(ub&&ubHtml){ub.innerHTML=ubHtml;ub.style.display='';}
     G.pver={current:r.current,update_available:r.update_available};
