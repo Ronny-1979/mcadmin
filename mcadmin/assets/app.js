@@ -366,6 +366,12 @@ async function loadBackupSchedule(){
   const s=await api('get_settings');
   document.getElementById('bk-sched-on').checked=s.backup_schedule_enabled||false;
   document.getElementById('bk-sched-time').value=s.backup_schedule_time||'03:00';
+  const sel=document.getElementById('bk-max-count');
+  if(sel)sel.value=String(s.backup_max_count||20);
+}
+async function saveBackupMaxCount(val){
+  const r=await api('save_backup_max_count',{count:val});
+  toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
 }
 // Speichert den Backup-Zeitplan (aktiviert/Zeit) aus dem Formular
 async function saveBackupSchedule(){

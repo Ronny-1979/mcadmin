@@ -70,6 +70,7 @@ function load_settings(): array {
             'update_available' => true,
             'world_switch'      => false,
         ],
+        'backup_max_count'        => MAX_BACKUP_COUNT,
         'backup_schedule_enabled' => false,
         'backup_schedule_time'    => '03:00',
         'backup_last_date'        => '',

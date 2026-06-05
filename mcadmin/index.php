@@ -537,7 +537,7 @@ try {
             </div>
           </div>
           <div class="card" style="margin:0">
-            <div class="ch"><div class="ct">📦 Backups</div><button class="btn ghost sm" onclick="loadBk()">⟳</button></div>
+            <div class="ch"><div class="ct">📦 Backups</div><div style="display:flex;align-items:center;gap:8px"><label style="font-size:11px;color:var(--text2);margin:0">Max. Backups</label><select id="bk-max-count" class="btn ghost sm" style="padding:4px 7px;font-size:11px;width:auto" onchange="saveBackupMaxCount(this.value)"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20" selected>20</option><option value="25">25</option><option value="30">30</option></select><button class="btn ghost sm" onclick="loadBk()">⟳</button></div></div>
             <div id="bk-list"><div class="cb dim xs2" style="text-align:center;padding:26px">Lade...</div></div>
           </div>
         </div>

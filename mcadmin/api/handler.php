@@ -291,6 +291,13 @@ try {
             }
             echo json_encode(['success' => save_settings($s), 'message' => 'Backup-Zeitplan gespeichert']); break;
 
+        case 'save_backup_max_count':  // Speichert das maximale Backup-Limit
+            $s = load_settings();
+            $count = (int)($_POST['count'] ?? 20);
+            $allowed = [5, 10, 15, 20, 25, 30];
+            $s['backup_max_count'] = in_array($count, $allowed) ? $count : 20;
+            echo json_encode(['success' => save_settings($s), 'message' => 'Limit gespeichert']); break;
+
         case 'save_restart_schedule':  // Speichert den täglichen Auto-Restart-Zeitplan
             $s = load_settings();
             $oldTime = $s['restart_schedule_time'] ?? '';
