@@ -208,6 +208,8 @@ try {
             $missBefore = count($before['behavior_missing']??[]) + count($before['resource_missing']??[]);
             $r = install_pack($_FILES['pack']['tmp_name'], $_FILES['pack']['name']);
             if (!$r['success']) { echo json_encode($r); break; }
+            get_installed_packs('behavior', false, true);
+            get_installed_packs('resource', false, true);
             apply_world_packs($world);
             $after = get_world_packs($world);
             $missAfter = count($after['behavior_missing']??[]) + count($after['resource_missing']??[]);

@@ -1844,10 +1844,11 @@ function get_pack_world_usage(string $type, string $uuid, $version = null): arra
 // Gibt alle installierten Behavior- oder Resource-Packs zurück.
 // $userOnly=true: nur vom Panel installierte Packs (für UI-Anzeige).
 // $userOnly=false: alle Packs inkl. Bedrock-Systempacks (für interne Lookups).
-function get_installed_packs(string $type = 'behavior', bool $userOnly = false): array {
+function get_installed_packs(string $type = 'behavior', bool $userOnly = false, bool $refresh = false): array {
     static $cache = [];
     $cacheKey = $type . ($userOnly ? ':u' : ':a');
-    if (isset($cache[$cacheKey])) return $cache[$cacheKey];
+    if (!$refresh && isset($cache[$cacheKey])) return $cache[$cacheKey];
+    unset($cache[$cacheKey]);
 
     $dir = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
     if (!is_dir($dir)) return $cache[$cacheKey] = [];
