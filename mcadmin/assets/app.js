@@ -735,6 +735,10 @@ async function loadSettings(){
   const updTime=document.getElementById('upd-check-time');
   if(updOn)updOn.checked=s.update_check_enabled||false;
   if(updTime)updTime.value=s.update_check_time||'04:00';
+  const autoMc=document.getElementById('auto-install-mc');
+  const autoPan=document.getElementById('auto-install-panel');
+  if(autoMc)autoMc.checked=s.auto_install_mc||false;
+  if(autoPan)autoPan.checked=s.auto_install_panel||false;
   const events=s.discord_events||{};
   document.querySelectorAll('.dc-evt').forEach(cb=>{cb.checked=events[cb.dataset.event]||false;});
   checkVer();
@@ -845,7 +849,14 @@ async function pollPanelUpd(){
 async function saveUpdateCheckSchedule(){
   const enabled=document.getElementById('upd-check-on').checked;
   const time=document.getElementById('upd-check-time').value||'04:00';
-  const r=await api('save_update_check_schedule',{enabled:enabled?'true':'false',time});
+  const autoMc=document.getElementById('auto-install-mc');
+  const autoPan=document.getElementById('auto-install-panel');
+  const r=await api('save_update_check_schedule',{
+    enabled:enabled?'true':'false',
+    time,
+    auto_install_mc:autoMc&&autoMc.checked?'true':'false',
+    auto_install_panel:autoPan&&autoPan.checked?'true':'false',
+  });
   toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
 }
 // Führt eine manuelle Update-Prüfung aus und sendet bei neuem Fund Discord-Hinweis

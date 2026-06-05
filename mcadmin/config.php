@@ -81,6 +81,8 @@ function load_settings(): array {
         'update_check_last_date'  => '',
         'update_check_last_mc_version' => '',
         'update_check_last_panel_sha'  => '',
+        'auto_install_mc'              => false,
+        'auto_install_panel'           => false,
     ];
     if (file_exists(MC_SETTINGS_FILE)) {
         $s = json_decode(file_get_contents(MC_SETTINGS_FILE), true);

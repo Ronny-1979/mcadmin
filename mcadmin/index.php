@@ -473,6 +473,20 @@ try {
               <label>Uhrzeit</label>
               <input type="time" id="upd-check-time" value="04:00" style="width:auto">
             </div>
+            <div class="fx ac mb12" style="gap:12px">
+              <label class="tgl" style="margin:0">
+                <input type="checkbox" id="auto-install-mc">
+                <span class="tsl"></span>
+              </label>
+              <span>⚠️ Minecraft Update automatisch installieren <span class="dim xs2">(Server wird neugestartet)</span></span>
+            </div>
+            <div class="fx ac mb12" style="gap:12px">
+              <label class="tgl" style="margin:0">
+                <input type="checkbox" id="auto-install-panel">
+                <span class="tsl"></span>
+              </label>
+              <span>⚠️ Panel automatisch installieren</span>
+            </div>
             <div class="fx g8" style="flex-wrap:wrap">
               <button class="btn primary" onclick="saveUpdateCheckSchedule()">💾 Update-Prüfung speichern</button>
               <button class="btn ghost" onclick="runUpdateCheckNow()">🔎 Jetzt prüfen</button>
