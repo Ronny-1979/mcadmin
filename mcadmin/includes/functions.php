@@ -2102,6 +2102,28 @@ function remove_pack_from_world(string $worldName, string $uuid, string $type): 
     return ['success' => true];
 }
 
+// Aktualisiert die Versions-Referenz eines Packs in einer Welt auf die installierte Version
+function update_pack_ref_version(string $worldName, string $uuid, string $type): bool {
+    $installed = find_installed_pack($type, $uuid); // UUID-only: findet jede installierte Version
+    if (!$installed) return false;
+
+    $state = get_state();
+    $found = false;
+    foreach ($state['world_packs'][$worldName][$type] ?? [] as &$ref) {
+        if (pack_ref_matches_uuid($ref, $uuid)) {
+            $ref['pack_id'] = $installed['uuid'];
+            $ref['version'] = pack_version_array($installed['version']);
+            $found = true;
+            break;
+        }
+    }
+    unset($ref);
+    if (!$found) return false;
+    save_state($state);
+    apply_world_packs($worldName);
+    return true;
+}
+
 // Schreibt die aktiven Packs einer Welt in die world_*_packs.json-Dateien
 function apply_world_packs(string $worldName): void {
     $worldPath = MC_WORLDS_DIR . '/' . $worldName;
