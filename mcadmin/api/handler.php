@@ -209,6 +209,13 @@ try {
             $missAfter = count($after['behavior_missing']??[]) + count($after['resource_missing']??[]);
             $resolved = $missBefore - $missAfter;
             if ($resolved > 0) {
+                // Neu installierte Packs als "für diese Welt importiert" markieren,
+                // damit sie beim Weltlöschen automatisch mit aufgeräumt werden.
+                foreach ($r['installed'] ?? [] as $pack) {
+                    if (!empty($pack['uuid'])) {
+                        track_pack_imported_for_world($world, $pack['uuid'], $pack['type'], $pack['version'] ?? '0.0.0');
+                    }
+                }
                 echo json_encode(['success'=>true,'message'=>"$resolved fehlendes Pack(s) erfolgreich installiert und verknüpft"]);
             } else {
                 echo json_encode(['success'=>false,'message'=>'Pack installiert, aber UUID stimmt mit keinem fehlenden Pack überein']);
