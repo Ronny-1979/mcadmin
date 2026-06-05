@@ -536,6 +536,7 @@ async function renameWorld(){
 // Schema-Definition der bekannten server.properties-Felder mit Typ und Optionen
 const SCHEMA=[
   {S:'Allgemein'},
+  {k:'level-name',l:'Weltordner',t:'text',d:'Name des geladenen Weltordners'},
   {k:'server-name',l:'Server Name',t:'text',d:'Anzeigename im Netzwerk'},
   {k:'gamemode',l:'Spielmodus',t:'sel',o:['survival','creative','adventure']},
   {k:'difficulty',l:'Schwierigkeit',t:'sel',o:['peaceful','easy','normal','hard']},
