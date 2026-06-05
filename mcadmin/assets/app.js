@@ -447,6 +447,7 @@ async function toggleMissingPanel(worldName){
           <div class="pkv"><span class="badge badge-r" style="margin-right:4px">${e(p.type)}</span>v${e(p.version)} · Nicht installiert</div>
           ${(p.required_by&&p.required_by.length)?`<div class="pkv" style="color:var(--text2);margin-top:2px">📎 Benötigt von: ${p.required_by.map(n=>e(n)).join(', ')}</div>`:''}
         </div>
+        <label class="icon-btn" title="Pack für diesen Slot hochladen" style="cursor:pointer">⬆<input type="file" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="supplyMissingPack('${e(worldName)}',this,'${e(p.uuid)}')"></label>
         <button class="icon-btn" title="Referenz entfernen" onclick="removeMissingRef('${e(worldName)}','${e(p.uuid)}','${p.type.toLowerCase()}')">✕</button>
       </div>`).join('')}
       <div class="uz" style="margin-top:10px" onclick="document.getElementById('mpp-up-${e(worldName)}').click()">
@@ -506,17 +507,18 @@ async function removePackFromWorld(worldName,uuid,type,name){
   }catch(err){toast('Fehler beim Entfernen','error');}
 }
 // Lädt ein fehlendes Pack hoch, installiert es und repariert die Welt-Referenz
-async function supplyMissingPack(worldName,inp){
+async function supplyMissingPack(worldName,inp,expectedUuid=''){
   const f=inp.files[0];if(!f)return;
   const st=document.getElementById('mpp-st-'+worldName);
-  st.innerHTML='<div class="dim xs2" style="margin-top:8px"><span class="spin">⟳</span> Installiere...</div>';
+  if(st)st.innerHTML='<div class="dim xs2" style="margin-top:8px"><span class="spin">⟳</span> Installiere...</div>';
   try{
-    const r=await api('supply_missing_pack',{world:worldName},{pack:f});
+    const params={world:worldName};if(expectedUuid)params.expected_uuid=expectedUuid;
+    const r=await api('supply_missing_pack',params,{pack:f});
     toast(r.message||(r.success?'Installiert':'Fehler'),r.success?'success':'error');
-    if(r.success)loadWorlds();
-    else st.innerHTML=`<div class="xs2" style="margin-top:8px;color:var(--red)">${e(r.message)}</div>`;
+    if(r.success){loadWorlds();await loadWPacks();}
+    else if(st)st.innerHTML=`<div class="xs2" style="margin-top:8px;color:var(--red)">${e(r.message)}</div>`;
   }catch(err){
-    st.innerHTML='<div class="xs2" style="margin-top:8px;color:var(--red)">❌ Upload fehlgeschlagen</div>';
+    if(st)st.innerHTML='<div class="xs2" style="margin-top:8px;color:var(--red)">❌ Upload fehlgeschlagen</div>';
   }
   inp.value='';
 }
@@ -695,13 +697,13 @@ function renderPacks(){
     if(packs.length){
       html+=packs.map(p=>{
         const en=active.some(a=>{const id=typeof a==='string'?a:(a.pack_id??a.uuid);return id===p.uuid&&(a.enabled!==false);});
-        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${showAll?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
+        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${showAll?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<label class="icon-btn" title="Pack aktualisieren" style="cursor:pointer">🔄<input type="file" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="replacePack('${e(p.uuid)}','${t}',this)"></label><button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
       }).join('');
     }
     // Fehlende Packs (UUID vorhanden, aber nicht installiert) — nur bei Weltauswahl
     if(!showAll&&missing.length){
       html+=`<div style="margin-top:8px;padding:4px 2px;font-size:11px;color:var(--text2)">Fehlende Packs — nicht auf diesem Server installiert:</div>`;
-      html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${mp.name?e(mp.name):'Unbekanntes Pack'}</div><div class="pkv" style="user-select:all">${e(mp.uuid)}</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div>${(mp.required_by&&mp.required_by.length)?`<div class="pkv" style="color:var(--text2);margin-top:2px">📎 Benötigt von: ${mp.required_by.map(n=>e(n)).join(', ')}</div>`:''}</div><span class="badge badge-r" style="flex-shrink:0">Fehlt</span><button class="icon-btn" title="Referenz entfernen" onclick="removeMissingRef('${e(world)}','${e(mp.uuid)}','${t}')">✕</button></div>`).join('');
+      html+=missing.map(mp=>`<div class="pkc pk-missing"><div class="pki">❓</div><div style="flex:1;min-width:0"><div class="pkn" style="color:var(--red)">${mp.name?e(mp.name):'Unbekanntes Pack'}</div><div class="pkv" style="user-select:all">${e(mp.uuid)}</div><div class="pkv">v${e(mp.version)} · Nicht installiert</div>${(mp.required_by&&mp.required_by.length)?`<div class="pkv" style="color:var(--text2);margin-top:2px">📎 Benötigt von: ${mp.required_by.map(n=>e(n)).join(', ')}</div>`:''}</div><label class="icon-btn" title="Pack für diesen Slot hochladen" style="cursor:pointer">⬆<input type="file" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="supplyMissingPack('${e(world)}',this,'${e(mp.uuid)}')"></label><button class="icon-btn" title="Referenz entfernen" onclick="removeMissingRef('${e(world)}','${e(mp.uuid)}','${t}')">✕</button></div>`).join('');
     }
     if(!html){
       html=`<div class="dim xs2" style="text-align:center;padding:18px">${showAll?'Keine Packs installiert':'Keine Packs für diese Welt'}</div>`;
@@ -713,6 +715,8 @@ function renderPacks(){
 async function togglePk(w,u,t,en){const r=await api('toggle_pack',{world:w,uuid:u,type:t,enable:en?'1':'0'});if(r.success){toast(en?'Aktiviert':'Deaktiviert','success');await loadWPacks();}else{toast('Fehler','error');await loadWPacks();}}
 // Löscht ein selbst installiertes Pack nach Bestätigung und aktualisiert die Listen
 async function deletePack(uuid,type,name){if(!confirm(`Pack "${name}" wirklich löschen?\nEs wird aus allen Welten entfernt und vom Server gelöscht.`))return;const r=await api('delete_pack',{uuid,type});toast(r.message||(r.success?'Pack gelöscht':'Fehler'),r.success?'success':'error');if(r.success){await loadAllPacks();await loadWPacks();}}
+// Ersetzt ein installiertes Pack durch eine neue Version und aktualisiert alle Welt-Referenzen
+async function replacePack(uuid,type,inp){const f=inp.files[0];if(!f)return;toast('Aktualisiere Pack...','info');const r=await api('replace_pack',{old_uuid:uuid,old_type:type},{pack:f});toast(r.message||(r.success?'Aktualisiert':'Fehler'),r.success?'success':'error');if(r.success){await loadAllPacks();await loadWPacks();}inp.value='';}
 // Entfernt eine gebrochene Pack-Referenz aus dem Welt-State (kein Pack nötig)
 async function removeMissingRef(world,uuid,type){if(!confirm('Gebrochene Pack-Referenz aus dieser Welt entfernen?\nDas Pack bleibt nicht mehr der Welt zugewiesen.'))return;const r=await api('toggle_pack',{world,uuid,type,enable:'0'});toast(r.success?'Referenz entfernt':'Fehler',r.success?'success':'error');if(r.success){await loadWorlds();await loadAllPacks();await loadWPacks();}}
 // Wechselt zwischen Resource- und Behavior-Pack-Tab
