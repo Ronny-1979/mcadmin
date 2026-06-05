@@ -28,10 +28,10 @@ function get_server_uptime(): string {
     $h  = intdiv($diff % 86400, 3600);
     $mi = intdiv($diff % 3600, 60);
     $parts = [];
-    if ($d > 0) $parts[] = $d . ' Tag' . ($d > 1 ? 'e' : '');
-    if ($h > 0) $parts[] = $h . ' Std.';
-    $parts[] = $mi . ' Min.';
-    return implode(', ', $parts);
+    if ($d > 0) $parts[] = "{$d}d";
+    if ($h > 0) $parts[] = "{$h}h";
+    $parts[] = "{$mi}m";
+    return implode(' ', $parts);
 }
 
 // Startet den Minecraft-Server via systemctl und sendet Discord-Benachrichtigung
@@ -822,7 +822,6 @@ if (file_exists($destLevelDat)) {
     }
 
     if ($fixedX !== null && $fixedY !== null && $fixedZ !== null) {
-        @copy($destLevelDat, $destLevelDat . '.mcadmin_bak');
         $ldRaw = (string)file_get_contents($destLevelDat);
 
         if (strlen($ldRaw) > 8) {
@@ -1782,12 +1781,8 @@ function get_pack_world_usage(string $type, string $uuid, $version = null): arra
 // $userOnly=true: nur vom Panel installierte Packs (für UI-Anzeige).
 // $userOnly=false: alle Packs inkl. Bedrock-Systempacks (für interne Lookups).
 function get_installed_packs(string $type = 'behavior', bool $userOnly = false): array {
-    static $cache = [];
-    $cacheKey = $type . ($userOnly ? ':u' : ':a');
-    if (isset($cache[$cacheKey])) return $cache[$cacheKey];
-
     $dir = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
-    if (!is_dir($dir)) return $cache[$cacheKey] = [];
+    if (!is_dir($dir)) return [];
 
     $packs = [];
 
@@ -1840,7 +1835,7 @@ function get_installed_packs(string $type = 'behavior', bool $userOnly = false):
         }
     }
 
-    return $cache[$cacheKey] = $packs;
+    return $packs;
 }
 
 // Löst einen Übersetzungs-Key im Pack-Namen auf (z.B. "pack.name" oder "%pack.name%").
@@ -2893,15 +2888,7 @@ function get_log_files(): array {
 
 // Analysiert das Server-Log und erstellt Spielzeit-, Sessions- und Kick-Statistiken je Spieler
 function get_player_stats(): array {
-    $cacheFile = sys_get_temp_dir() . '/mcadmin_pstats.json';
-    $logFiles  = get_log_files();
-    $logFile   = null;
-    foreach ($logFiles as $f) { if (file_exists($f)) { $logFile = $f; break; } }
-    if ($logFile && file_exists($cacheFile)) {
-        $c = json_decode((string)file_get_contents($cacheFile), true) ?? [];
-        if (($c['mtime'] ?? 0) >= filemtime($logFile) && isset($c['data'])) return $c['data'];
-    }
-
+    $logFiles = get_log_files();
     $lines = [];
     foreach ($logFiles as $f) { if (file_exists($f)) { $lines = file($f, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES)?:[]; break; } }
     if (empty($lines)) {
@@ -2937,9 +2924,7 @@ function get_player_stats(): array {
     }
     unset($s);
     usort($stats, fn($a,$b) => $b['playtime_seconds']-$a['playtime_seconds']);
-    $result = array_values($stats);
-    if ($logFile) @file_put_contents($cacheFile, json_encode(['mtime' => filemtime($logFile), 'data' => $result]));
-    return $result;
+    return array_values($stats);
 }
 
 // ============================================================
@@ -2963,15 +2948,6 @@ function get_log_lines(int $lines = 100, int $offset = 0): array {
             return ['lines' => $slice, 'total' => $total, 'source' => 'journalctl'];
         }
         return ['lines'=>[],'total'=>0,'source'=>'none'];
-    }
-    // Für große Log-Dateien (>512 KB) nur die benötigten Zeilen via tail lesen
-    if ($offset === 0 && filesize($logFile) > 512 * 1024) {
-        $out = shell_exec('tail -n ' . (int)$lines . ' ' . escapeshellarg($logFile) . ' 2>/dev/null');
-        if ($out !== null) {
-            $result = array_values(array_filter(explode("\n", $out), fn($l) => $l !== ''));
-            $total  = (int)trim(shell_exec('wc -l < ' . escapeshellarg($logFile)) ?: '0');
-            return ['lines' => $result, 'total' => $total, 'source' => basename($logFile)];
-        }
     }
     $all    = file($logFile, FILE_IGNORE_NEW_LINES) ?: [];
     $total  = count($all);
