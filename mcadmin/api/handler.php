@@ -148,8 +148,8 @@ try {
             echo json_encode(['success'=>save_world_properties_values($world,$props),'message'=>'Einstellungen gespeichert']); break;
 
         // ── PACKS ─────────────────────────────────────────────
-        case 'get_packs':       // Gibt alle installierten Behavior- und Resource-Packs zurück
-            echo json_encode(['behavior'=>get_installed_packs('behavior'),'resource'=>get_installed_packs('resource')]); break;
+        case 'get_packs':       // Gibt alle vom Panel installierten Packs zurück (Systempacks ausgeblendet)
+            echo json_encode(['behavior'=>get_installed_packs('behavior',true),'resource'=>get_installed_packs('resource',true)]); break;
         case 'get_world_packs': // Gibt die aktiven Packs einer Welt zurück
             echo json_encode(get_world_packs($_POST['world']??get_active_world()??'')); break;
         case 'toggle_pack':     // Aktiviert oder deaktiviert ein Pack für eine Welt
