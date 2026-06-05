@@ -8,8 +8,11 @@ session_start();
 if (($_GET['action'] ?? '') === 'download_backup') {
     if (empty($_SESSION['authenticated'])) { http_response_code(401); exit; }
     $filename = basename($_GET['filename'] ?? '');
+    if (!$filename || !preg_match('/^[a-zA-Z0-9_\-\.]+\.tar\.gz$/', $filename)) { http_response_code(400); exit; }
     $path = MC_BACKUP_DIR . '/' . $filename;
     if (!file_exists($path)) { http_response_code(404); echo json_encode(['success'=>false,'message'=>'Backup nicht gefunden']); exit; }
+    $realPath = realpath($path); $realBkDir = realpath(MC_BACKUP_DIR);
+    if (!$realPath || !$realBkDir || strncmp($realPath, $realBkDir . '/', strlen($realBkDir) + 1) !== 0) { http_response_code(403); exit; }
     $safeFilename = preg_replace('/[^a-zA-Z0-9._\-]/', '_', $filename);
     header('Content-Type: application/gzip');
     header('Content-Disposition: attachment; filename="'.$safeFilename.'"');
@@ -248,7 +251,13 @@ try {
             echo json_encode(['success'=>true,'message'=>'Backup importiert: '.$importName]); break;
 
         // ── CONSOLE ───────────────────────────────────────────
-        case 'console_send': echo json_encode(console_send($_POST['cmd']??'')); break;  // Sendet Befehl an Server-Konsole
+        case 'console_send':  // Sendet Befehl an Server-Konsole (max. 2 pro Sekunde)
+            $now = microtime(true);
+            if (($now - (float)($_SESSION['last_cmd_ts'] ?? 0)) < 0.5) {
+                echo json_encode(['success'=>false,'message'=>'Bitte kurz warten']); break;
+            }
+            $_SESSION['last_cmd_ts'] = $now;
+            echo json_encode(console_send($_POST['cmd']??'')); break;
         case 'get_log':      // Gibt die letzten N Log-Zeilen zurück
                 $lines = max(20, min(100, (int)($_POST['lines'] ?? 100)));
                  echo json_encode(get_log_lines($lines, 0)); break;
