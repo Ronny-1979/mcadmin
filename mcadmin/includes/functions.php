@@ -2302,11 +2302,13 @@ function delete_backup(string $filename): bool {
     return file_exists($path) && unlink($path);
 }
 
-// Löscht die ältesten Backups, sobald MAX_BACKUP_COUNT überschritten wird
+// Löscht die ältesten Backups, sobald das konfigurierbare Limit überschritten wird
 function cleanup_old_backups(): void {
-    $backups = get_backups();
-    if (count($backups) > MAX_BACKUP_COUNT)
-        foreach (array_slice($backups, MAX_BACKUP_COUNT) as $b) unlink(MC_BACKUP_DIR . '/' . $b['filename']);
+    $settings = load_settings();
+    $limit    = max(1, (int)($settings['backup_max_count'] ?? MAX_BACKUP_COUNT));
+    $backups  = get_backups();
+    if (count($backups) > $limit)
+        foreach (array_slice($backups, $limit) as $b) unlink(MC_BACKUP_DIR . '/' . $b['filename']);
 }
 
 // ============================================================
