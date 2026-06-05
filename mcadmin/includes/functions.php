@@ -499,34 +499,6 @@ function save_world_properties_values(string $worldName, array $values): bool {
 // WORLD MANAGEMENT
 // ============================================================
 
-// Patcht ein TAG_Byte in Bedrock-NBT (level.dat), oder fügt es neu ein wenn es fehlt.
-// ldRaw enthält die komplette level.dat-Binärdatei (mit 8-Byte-Header).
-function patch_or_insert_byte_tag(string &$ldRaw, string $tag, int $val): void {
-    if (strlen($ldRaw) < 8) return;
-
-    $nbtLen = (int)unpack('V', substr($ldRaw, 4, 4))[1];
-    $ldNbt  = substr($ldRaw, 8, $nbtLen);
-    $tagPat = "\x01" . pack('v', strlen($tag)) . $tag;
-    $tagPos = strpos($ldNbt, $tagPat);
-
-    if ($tagPos !== false) {
-        $valOff = 8 + $tagPos + strlen($tagPat);
-        if ($valOff < strlen($ldRaw)) {
-            $ldRaw[$valOff] = chr($val & 0xFF);
-        }
-        return;
-    }
-
-    $newBytes  = $tagPat . chr($val & 0xFF);
-    $insertAt  = 8 + $nbtLen;
-    // Falls das letzte Byte TAG_End (0x00) ist, davor einfügen
-    if ($nbtLen > 0 && strlen($ldRaw) >= $insertAt && ord($ldRaw[$insertAt - 1]) === 0x00) {
-        $insertAt -= 1;
-    }
-    $ldRaw  = substr($ldRaw, 0, $insertAt) . $newBytes . substr($ldRaw, $insertAt);
-    $newLen = $nbtLen + strlen($newBytes);
-    $ldRaw  = substr($ldRaw, 0, 4) . pack('V', $newLen) . substr($ldRaw, 8);
-}
 
 // Konvertiert Item-JSON-Dateien eines Behavior Packs von altem format_version (< "1.20")
 // auf "1.20.80". Ab BDS 1.21.20 wurde das "Holiday Creator Features"-Experiment entfernt,
@@ -1694,10 +1666,6 @@ function add_pack_ref(array &$list, string $uuid, $version): void {
     $list[] = $ref;
 }
 
-// Entfernt alle Einträge mit einer bestimmten UUID aus einer Pack-Referenzliste
-function remove_pack_ref_by_uuid(array &$list, string $uuid): void {
-    $list = array_values(array_filter($list, fn($entry) => !pack_ref_matches_uuid($entry, $uuid)));
-}
 
 // Sucht ein installiertes Pack nach Typ, UUID und optionaler Version
 function find_installed_pack(string $type, string $uuid, $version = null): ?array {
@@ -2966,11 +2934,4 @@ function extract_zip(string $file, string $dest): bool {
     if(class_exists('ZipArchive')){$zip=new ZipArchive();if($zip->open($file)===true){$zip->extractTo($dest);$zip->close();return true;}}
     exec('unzip -o '.escapeshellarg($file).' -d '.escapeshellarg($dest).' 2>&1',$out,$code);
     return $code===0;
-}
-// Lädt eine Datei via wget oder curl herunter und prüft ob sie nicht leer ist
-function download_file(string $url, string $dest): bool {
-    exec('wget -q -O '.escapeshellarg($dest).' '.escapeshellarg($url).' 2>&1',$out,$code);
-    if($code===0&&file_exists($dest)&&filesize($dest)>0) return true;
-    exec('curl -sL -o '.escapeshellarg($dest).' '.escapeshellarg($url).' 2>&1',$out,$code);
-    return $code===0&&file_exists($dest)&&filesize($dest)>0;
 }
