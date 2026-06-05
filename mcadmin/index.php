@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['password'])) {
         session_regenerate_id(true);
         $_SESSION['authenticated'] = true;
         $_SESSION['admin_user']    = $u;
+        header('Location: index.php'); exit;
     } else {
         $login_error = 'Falscher Benutzername oder Passwort';
     }
