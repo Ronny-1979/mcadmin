@@ -1306,7 +1306,21 @@ function delete_imported_packs_for_world(string $worldName): array {
             $uuid    = $pack['pack_id'] ?? '';
             $version = $pack['version'] ?? null;
 
-            if ($folder === '' || $uuid === '') continue;
+            if ($uuid === '') continue;
+
+            // Kein Ordner direkt gespeichert → per UUID im Pack-Verzeichnis suchen (Fallback für ältere State-Einträge)
+            if ($folder === '') {
+                foreach (array_diff((array)@scandir($baseDir), ['.', '..']) as $d) {
+                    $p  = $baseDir . '/' . $d;
+                    if (!is_dir($p)) continue;
+                    $mf = json_decode((string)@file_get_contents($p . '/manifest.json'), true) ?? [];
+                    if (strtolower($mf['header']['uuid'] ?? '') === strtolower($uuid)) {
+                        $folder = $d;
+                        break;
+                    }
+                }
+            }
+            if ($folder === '') { $kept[] = "$uuid ($type) — Ordner nicht gefunden"; continue; }
 
             $usedByOtherWorld = false;
 
@@ -2182,7 +2196,7 @@ function install_pack(string $tmpPath, string $originalName): array {
 }
 
 // Merkt ein Pack als "für diese Welt importiert" im State, damit es beim Weltlöschen aufgeräumt wird.
-function track_pack_imported_for_world(string $worldName, string $uuid, string $type, $version): void {
+function track_pack_imported_for_world(string $worldName, string $uuid, string $type, $version, string $folder = ''): void {
     $state = get_state();
     if (!isset($state['world_imported_packs'][$worldName])) {
         $state['world_imported_packs'][$worldName] = ['behavior' => [], 'resource' => []];
@@ -2192,7 +2206,7 @@ function track_pack_imported_for_world(string $worldName, string $uuid, string $
         $ref = normalize_pack_ref($entry);
         if ($ref && strtolower($ref['pack_id']) === strtolower($uuid)) return; // bereits eingetragen
     }
-    $list[] = ['pack_id' => $uuid, 'version' => pack_version_array($version)];
+    $list[] = ['folder' => $folder, 'pack_id' => $uuid, 'version' => pack_version_array($version)];
     save_state($state);
 }
 
@@ -2204,7 +2218,7 @@ function install_pack_for_world(string $tmpPath, string $originalName, string $w
     foreach ($r['installed'] as $pack) {
         if (!empty($pack['uuid']) && toggle_pack_for_world($worldName, $pack['uuid'], $pack['type'], true)) {
             $activated++;
-            track_pack_imported_for_world($worldName, $pack['uuid'], $pack['type'], $pack['version'] ?? '0.0.0');
+            track_pack_imported_for_world($worldName, $pack['uuid'], $pack['type'], $pack['version'] ?? [0,0,0], $pack['folder'] ?? '');
         }
     }
     if ($activated > 0) apply_world_packs($worldName);
@@ -2275,7 +2289,13 @@ function install_pack_dir(string $dir, array &$results): void {
         $destPath = $destBase . '/' . sanitize_dirname($name);
         copy_pack_skip_subpacks($dir, $destPath);
         mark_mcadmin_user_pack($destPath);
-        $results[] = ['name' => $name, 'type' => $type, 'uuid' => strtolower($data['header']['uuid'] ?? '')];
+        $results[] = [
+            'name'    => $name,
+            'type'    => $type,
+            'uuid'    => strtolower($data['header']['uuid'] ?? ''),
+            'folder'  => basename($destPath),
+            'version' => $data['header']['version'] ?? [0, 0, 0],
+        ];
         return;
     }
     foreach (scandir($dir) as $sub) {
