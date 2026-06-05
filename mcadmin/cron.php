@@ -85,6 +85,20 @@ if (!empty($s['update_check_enabled'])) {
             . ', Panel ' . ($pa['current'] ?? '?') . ' → ' . ($pa['latest'] ?? '?')
             . ($sent ? " | Discord: {$sent}" : '')
             . "\n";
+
+        // Auto-Install Minecraft
+        $s = load_settings();
+        if (!empty($s['auto_install_mc']) && !empty($result['minecraft']['update_available'])) {
+            $mcVer = $result['minecraft']['latest'];
+            $inst  = run_update_async($mcVer);
+            echo date('Y-m-d H:i:s') . " [auto-install-mc] Gestartet: {$mcVer} → " . ($inst['success'] ? 'OK' : ($inst['message'] ?? 'Fehler')) . "\n";
+        }
+
+        // Auto-Install Panel
+        if (!empty($s['auto_install_panel']) && !empty($result['panel']['update_available'])) {
+            $inst = run_panel_update_async();
+            echo date('Y-m-d H:i:s') . " [auto-install-panel] Gestartet → " . ($inst['success'] ? 'OK' : ($inst['message'] ?? 'Fehler')) . "\n";
+        }
     }
 }
 

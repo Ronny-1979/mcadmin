@@ -307,7 +307,9 @@ try {
             $s = load_settings();
             $s['update_check_enabled'] = filter_var($_POST['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $time = $_POST['time'] ?? '04:00';
-            $s['update_check_time'] = preg_match('/^\d{2}:\d{2}$/', $time) ? $time : '04:00';
+            $s['update_check_time']    = preg_match('/^\d{2}:\d{2}$/', $time) ? $time : '04:00';
+            $s['auto_install_mc']      = filter_var($_POST['auto_install_mc']    ?? false, FILTER_VALIDATE_BOOLEAN);
+            $s['auto_install_panel']   = filter_var($_POST['auto_install_panel'] ?? false, FILTER_VALIDATE_BOOLEAN);
             echo json_encode(['success' => save_settings($s), 'message' => 'Update-Prüfung gespeichert']); break;
 
         case 'run_update_check_now':  // Manuelle Update-Prüfung inkl. Discord-Hinweis bei neuem Update
