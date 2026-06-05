@@ -128,34 +128,39 @@ function get_server_version(): string {
 
 // Prüft eingebettete Pack-Manifeste und Experiment-Flags der Welt auf BDS-Versions-Kompatibilität
 function check_world_compat_issues(string $worldRoot, string $bdVersion): array {
-    $bdParts = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
-    $issues  = [];
-    foreach (['behavior_packs', 'resource_packs'] as $packDir) {
-        $base = $worldRoot . '/' . $packDir;
-        if (!is_dir($base)) continue;
-        foreach (array_diff((array)@scandir($base), ['.', '..']) as $pack) {
-            $manifest = $base . '/' . $pack . '/manifest.json';
-            if (!file_exists($manifest)) continue;
-            $data   = json_decode((string)file_get_contents($manifest), true);
-            $minVer = $data['header']['min_engine_version'] ?? null;
-            if (!is_array($minVer) || count($minVer) < 2) continue;
-            $minParts = array_map('intval', array_slice($minVer, 0, 3));
-            foreach ([0, 1, 2] as $i) {
-                $bd  = $bdParts[$i]  ?? 0;
-                $min = $minParts[$i] ?? 0;
-                if ($min > $bd) {
-                    $issues[] = [
-                        'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
-                        'pack'      => $data['header']['name'] ?? $pack,
-                        'requires'  => implode('.', $minParts),
-                        'installed' => implode('.', $bdParts),
-                    ];
-                    break;
+    $bdParts      = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
+    $versionKnown = ($bdParts[0] > 0); // "unbekannt"/"nicht installiert" → [0,0,0] → kein Pack-Check
+    $issues       = [];
+
+    if ($versionKnown) {
+        foreach (['behavior_packs', 'resource_packs'] as $packDir) {
+            $base = $worldRoot . '/' . $packDir;
+            if (!is_dir($base)) continue;
+            foreach (array_diff((array)@scandir($base), ['.', '..']) as $pack) {
+                $manifest = $base . '/' . $pack . '/manifest.json';
+                if (!file_exists($manifest)) continue;
+                $data   = json_decode((string)file_get_contents($manifest), true);
+                $minVer = $data['header']['min_engine_version'] ?? null;
+                if (!is_array($minVer) || count($minVer) < 2) continue;
+                $minParts = array_map('intval', array_slice($minVer, 0, 3));
+                foreach ([0, 1, 2] as $i) {
+                    $bd  = $bdParts[$i]  ?? 0;
+                    $min = $minParts[$i] ?? 0;
+                    if ($min > $bd) {
+                        $issues[] = [
+                            'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
+                            'pack'      => $data['header']['name'] ?? $pack,
+                            'requires'  => implode('.', $minParts),
+                            'installed' => implode('.', $bdParts),
+                        ];
+                        break;
+                    }
+                    if ($bd > $min) break;
                 }
-                if ($bd > $min) break;
             }
         }
     }
+
     $experiments = get_world_experiments($worldRoot);
     return ['issues' => $issues, 'experiments' => $experiments];
 }
@@ -656,13 +661,16 @@ function install_world(string $tmpPath, string $originalName, bool $force = fals
     }
 
     if (!$force) {
-        $bdVer  = get_server_version();
-        $compat = check_world_compat_issues($worldRoot, $bdVer);
-        if (!empty($compat['issues']) || !empty($compat['experiments'])) {
+        $bdVer     = get_server_version();
+        $compat    = check_world_compat_issues($worldRoot, $bdVer);
+        $hasIssues = !empty($compat['issues']);
+        $hasExps   = !empty($compat['experiments']);
+        if ($hasIssues || $hasExps) {
             exec('rm -rf ' . escapeshellarg($tmpDir));
             return [
                 'success'               => false,
                 'compatibility_warning' => true,
+                'soft_warning'          => !$hasIssues, // nur Experiments → kein harter Versions-Konflikt
                 'issues'                => $compat['issues'],
                 'experiments'           => $compat['experiments'],
                 'message'               => 'Mögliche Versions-Kompatibilitätsprobleme gefunden.',
@@ -1139,7 +1147,7 @@ function get_world_experiments(string $worldPath): array {
     $expLabels = [
         'gametest'                     => 'GameTest',
         'upcoming_creator_features'    => 'Creator Features',
-        'holiday_creator_features'     => 'Holiday Features',
+        'holiday_creator_features'     => 'Holiday Features (entfernt ab BDS 1.21.20)',
         'experimental_molang_features' => 'Molang',
         'cameras'                      => 'Cameras',
         'experimental_creator_cameras' => 'Creator Cameras',
@@ -2284,7 +2292,8 @@ function install_pack_dir(string $dir, array &$results): void {
             }
         }
         if ($skipPack) return; // Kein installierbares Server-Pack → überspringen
-        $name     = $data['header']['name'] ?? basename($dir);
+        $name = trim(preg_replace('/§[0-9a-fk-orA-FK-OR]/u', '', (string)($data['header']['name'] ?? basename($dir))));
+        if ($name === '') $name = basename($dir);
         $destBase = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
         if (!is_dir($destBase)) mkdir($destBase, 0755, true);
         $destPath = $destBase . '/' . sanitize_dirname($name);

@@ -233,7 +233,7 @@ try {
     <div class="dim xs2" style="margin-bottom:16px">Die Welt könnte sich anders verhalten oder Inhalte könnten nicht funktionieren.</div>
     <div class="mf">
       <button class="btn ghost sm" onclick="closeModal('modal-world-compat');pendingWorldFile=null;">Abbrechen</button>
-      <button class="btn warn sm" onclick="forceInstallWorld()">Trotzdem installieren</button>
+      <button id="compat-install-btn" class="btn warn sm" onclick="forceInstallWorld()">Trotzdem installieren</button>
     </div>
   </div>
 </div>
