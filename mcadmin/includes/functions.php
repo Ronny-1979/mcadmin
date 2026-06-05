@@ -1561,7 +1561,8 @@ function install_single_world_pack(
     if ($uuid === '') return;
 
     $version = pack_version_array($header['version'] ?? [0, 0, 0]);
-    $name    = trim(preg_replace('/§[0-9a-fk-orA-FK-OR]/u', '', (string)($header['name'] ?? basename($packSrc))));
+    $rawName = (string)($header['name'] ?? basename($packSrc));
+    $name    = trim(preg_replace('/§[0-9a-fk-orA-FK-OR]/u', '', resolve_pack_name($packSrc, $rawName)));
     if ($name === '') $name = basename($packSrc);
 
     $packDest = $srvDir . '/' . basename($packSrc);
@@ -2292,7 +2293,8 @@ function install_pack_dir(string $dir, array &$results): void {
             }
         }
         if ($skipPack) return; // Kein installierbares Server-Pack → überspringen
-        $name = trim(preg_replace('/§[0-9a-fk-orA-FK-OR]/u', '', (string)($data['header']['name'] ?? basename($dir))));
+        $rawName = (string)($data['header']['name'] ?? basename($dir));
+        $name    = trim(preg_replace('/§[0-9a-fk-orA-FK-OR]/u', '', resolve_pack_name($dir, $rawName)));
         if ($name === '') $name = basename($dir);
         $destBase = $type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR;
         if (!is_dir($destBase)) mkdir($destBase, 0755, true);
