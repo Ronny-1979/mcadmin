@@ -2964,7 +2964,7 @@ function get_log_lines(int $lines = 100, int $offset = 0): array {
         }
         return ['lines'=>[],'total'=>0,'source'=>'none'];
     }
-    // Für große Log-Dateien (>512 KB) nur die benötigten Zeilen via tail lesen
+    // Große Log-Dateien (>512 KB) nur via tail lesen statt komplett in den RAM
     if ($offset === 0 && filesize($logFile) > 512 * 1024) {
         $out = shell_exec('tail -n ' . (int)$lines . ' ' . escapeshellarg($logFile) . ' 2>/dev/null');
         if ($out !== null) {

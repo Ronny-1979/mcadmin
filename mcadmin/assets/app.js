@@ -4,7 +4,7 @@ const G={
   srv:{running:false,version:'',active_world:'',players:[]},
   ver:null,packs:{behavior:[],resource:[]},wPacks:{behavior:[],resource:[]},
   propsWorld:null,propsData:{},
-  conPaused:false,conTimer:null,conActive:false,conHist:(()=>{try{return JSON.parse(localStorage.getItem('mcadmin_conHist')||'[]');}catch(e){return[];}}()),conHistIdx:-1,conLines:100,
+  conPaused:false,conTimer:null,conActive:false,conHist:[],conHistIdx:-1,conLines:100,
   srvWasRunning:false,
 };
 
@@ -15,10 +15,10 @@ async function api(action,data={},files={}){
   for(const[k,v]of Object.entries(data))fd.append(k,v);
   for(const[k,v]of Object.entries(files))fd.append(k,v);
   const ctrl=new AbortController();
-  const tid=setTimeout(()=>ctrl.abort(),60000);
+  const tid=setTimeout(function(){ctrl.abort();},60000);
   try{
     const r=await fetch('api/handler.php',{method:'POST',body:fd,signal:ctrl.signal});
-    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    if(!r.ok)throw new Error('HTTP '+r.status);
     return r.json();
   }finally{clearTimeout(tid);}
 }
@@ -223,13 +223,16 @@ function quickCmd(cmd){document.getElementById('con-inp').value=cmd;conSend();}
 // Liest den Konsoleneingabe-Inhalt, speichert ihn im Verlauf und sendet den Befehl
 async function conSend(){
   const inp=document.getElementById('con-inp');const cmd=inp.value.trim();if(!cmd)return;
-  G.conHist.unshift(cmd);if(G.conHist.length>50)G.conHist.length=50;G.conHistIdx=-1;inp.value='';try{localStorage.setItem('mcadmin_conHist',JSON.stringify(G.conHist));}catch(e){}
+  G.conHist.unshift(cmd);if(G.conHist.length>50)G.conHist.length=50;G.conHistIdx=-1;inp.value='';
+  try{localStorage.setItem('mcadmin_conHist',JSON.stringify(G.conHist));}catch(e){}
   const out=document.getElementById('con-out');
   const el=document.createElement('span');el.className='cl cl-cmd';el.textContent='> '+cmd;out.appendChild(el);out.scrollTop=out.scrollHeight;
   const r=await api('console_send',{cmd});
   if(!r.success)toast(r.message||'Befehl konnte nicht gesendet werden','warn');
 }
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',function(){
+  // Konsolen-Verlauf aus localStorage laden
+  try{G.conHist=JSON.parse(localStorage.getItem('mcadmin_conHist')||'[]');}catch(e){}
   const inp=document.getElementById('con-inp');
   if(inp){
     inp.addEventListener('keydown',ev=>{
@@ -238,9 +241,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
     inp.addEventListener('input',()=>{G.conHistIdx=-1;});
   }
-  // Enter-Taste in Modals
-  ['cw-name','cw-seed'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('keydown',ev=>{if(ev.key==='Enter')createWorld();});});
-  const rwNew=document.getElementById('rw-new');if(rwNew)rwNew.addEventListener('keydown',ev=>{if(ev.key==='Enter')renameWorld();});
+  // Enter-Taste in Welt-Modals
+  ['cw-name','cw-seed'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('keydown',function(ev){if(ev.key==='Enter')createWorld();});});
+  var rwNew=document.getElementById('rw-new');if(rwNew)rwNew.addEventListener('keydown',function(ev){if(ev.key==='Enter')renameWorld();});
   startCon();
   window.addEventListener('resize',resizeCon);
 });
@@ -538,7 +541,7 @@ function delWorld(name){
 }
 // Führt das Löschen der Welt nach Modal-Bestätigung durch
 async function confirmDelWorld(){
-  const name=document.getElementById('modal-del-world').dataset.world;
+  var name=document.getElementById('modal-del-world').dataset.world;
   closeModal('modal-del-world');
   const r=await api('delete_world',{world:name});toast(r.message,r.success?'success':'error');if(r.success)loadWorlds();
 }
