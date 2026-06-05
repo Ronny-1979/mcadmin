@@ -38,7 +38,7 @@ define('MC_PANEL_UPDATE_SCRIPT', '/usr/local/sbin/mcadmin-panel-update.sh');
 define('MC_PANEL_UPDATE_CACHE',  __DIR__ . '/panel_version_cache.json');
 
 // ── Versions-Cache ────────────────────────────────────────────
-define('MC_VERSION_CACHE_TTL', 3600);
+define('MC_VERSION_CACHE_TTL', 900);
 
 // ── Backup-Limit ──────────────────────────────────────────────
 define('MAX_BACKUP_COUNT', 20);
