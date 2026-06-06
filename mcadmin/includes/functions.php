@@ -2928,10 +2928,15 @@ function get_log_lines(int $lines = 100, int $offset = 0): array {
     return ['lines'=>$slice,'total'=>$total,'source'=>basename($logFile)];
 }
 
-// Sendet einen Befehl an die Server-Konsole via screen, tmux oder stdin
+// Sendet einen Befehl an die Server-Konsole via FIFO, screen, tmux oder stdin
 function console_send(string $cmd): array {
     $cmd = trim($cmd);
     if ($cmd === '') return ['success'=>false,'message'=>'Leerer Befehl'];
+    $fifo = MC_SERVER_DIR . '/server.stdin';
+    if (file_exists($fifo) && filetype($fifo) === 'fifo') {
+        $fp = @fopen($fifo, 'w');
+        if ($fp !== false) { fwrite($fp, $cmd . "\n"); fclose($fp); return ['success'=>true,'message'=>'Befehl gesendet']; }
+    }
     exec('screen -S minecraft -X stuff '.escapeshellarg($cmd."\n").' 2>&1',$out,$code);
     if ($code===0) return ['success'=>true,'message'=>'Befehl gesendet (screen)'];
     exec('tmux send-keys -t minecraft '.escapeshellarg($cmd).' Enter 2>&1',$out,$code);
