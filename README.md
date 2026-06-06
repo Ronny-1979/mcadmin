@@ -63,13 +63,13 @@ curl -fsSL https://raw.githubusercontent.com/Ronny-1979/mcadmin/main/install.sh 
 Auf einen Blick: Server-Status, Uptime, aktive Welt und Online-Spieler. Server starten, stoppen und neu starten per Knopfdruck. Online-Spieler lassen sich direkt OP-en, kicken oder zur Whitelist hinzufügen. Die Live-Konsole läuft immer sichtbar mit.
 
 ### 🌍 Welten
-Welten erstellen, per Drag & Drop importieren (`.mcworld`), umbenennen oder löschen. Beim Welt-Wechsel wird die jeweilige `server.properties` automatisch gespeichert und wieder geladen — jede Welt hat also ihre eigene Konfiguration.
+Welten erstellen, per Drag & Drop importieren (`.mcworld`), umbenennen oder löschen. Beim Welt-Wechsel wird die jeweilige `server.properties` automatisch gespeichert und wieder geladen — jede Welt hat also ihre eigene Konfiguration. Packs sind direkt in jede Welt-Karte integriert: fehlende Packs lassen sich per Upload reparieren, vorhandene Packs aktivieren/deaktivieren oder aus der Welt entfernen. Neue Packs können direkt beim Upload sofort für die jeweilige Welt aktiviert werden.
 
 ### ⚙️ Server-Einstellungen
 Vollständiger Editor für `server.properties` direkt im Browser, aufgeteilt in Allgemein, Gameplay, Performance und Netzwerk. Unbekannte Keys werden automatisch als Freitextfelder dargestellt.
 
 ### 📦 Packs & Add-ons
-Resource- und Behavior-Packs per Klick oder Drag & Drop hochladen (`.mcpack`, `.mcaddon`, `.zip`). Pro Welt lassen sich Packs per Toggle aktivieren oder deaktivieren. Vorhandene Packs lassen sich direkt durch eine neue Version ersetzen — alle Welt-Referenzen werden automatisch aktualisiert.
+Globale Übersicht aller installierten Resource- und Behavior-Packs mit Welt-Auswahl. Packs aktivieren/deaktivieren, komplett löschen oder direkt durch eine neue Version ersetzen — alle Welt-Referenzen werden automatisch aktualisiert. Der Pack-Upload selbst erfolgt direkt in den Welten-Karten.
 
 ### 📋 Whitelist & Spieler
 Whitelist verwalten, OP-Status setzen und entziehen. Dazu eine Spieler-Statistik mit Spielzeit-Balkendiagramm, Session-Verlauf, Kicks und erstem Login.
