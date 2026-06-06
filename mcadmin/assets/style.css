@@ -423,7 +423,7 @@ html[data-theme="light"] .console-box,
 html[data-theme="light"] .lbox{background:#101722;color:#dbe7f3;border-color:#04070c #485566 #485566 #04070c}
 html[data-theme="light"] .con-out{background:#101722}
 html[data-theme="light"] .con-in{border-top-color:#04070c;background:#0c121b}
-html[data-theme="light"] .con-in input{color:#dbe7f3}
+html[data-theme="light"] .con-in input{color:#dbe7f3;background:#0c121b}
 html[data-theme="light"] .con-in button{border-left-color:#04070c}
 
 html[data-theme="light"] .lw{

@@ -602,6 +602,7 @@ async function saveWelcomeMsg(worldName){
   if(mode!=='say') msg=`#display:${mode}:${dur}\n${msg}`;
   const r=await api('save_welcome_message',{world:worldName,message:msg});
   toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
+  if(r.success) panel.classList.add('hidden');
 }
 // Fügt einen Platzhalter an der Cursor-Position im Willkommens-Textarea ein
 function insertWelcomePlaceholder(worldName,ph){
