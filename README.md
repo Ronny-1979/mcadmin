@@ -69,10 +69,13 @@ Welten erstellen, per Drag & Drop importieren (`.mcworld`), umbenennen oder lös
 Vollständiger Editor für `server.properties` direkt im Browser, aufgeteilt in Allgemein, Gameplay, Performance und Netzwerk. Unbekannte Keys werden automatisch als Freitextfelder dargestellt.
 
 ### 📦 Packs & Add-ons
-Resource- und Behavior-Packs per Klick oder Drag & Drop hochladen (`.mcpack`, `.mcaddon`, `.zip`). Pro Welt lassen sich Packs per Toggle aktivieren oder deaktivieren.
+Resource- und Behavior-Packs per Klick oder Drag & Drop hochladen (`.mcpack`, `.mcaddon`, `.zip`). Pro Welt lassen sich Packs per Toggle aktivieren oder deaktivieren. Vorhandene Packs lassen sich direkt durch eine neue Version ersetzen — alle Welt-Referenzen werden automatisch aktualisiert.
 
 ### 📋 Whitelist & Spieler
 Whitelist verwalten, OP-Status setzen und entziehen. Dazu eine Spieler-Statistik mit Spielzeit-Balkendiagramm, Session-Verlauf, Kicks und erstem Login.
+
+### 🎉 Willkommensnachrichten
+Pro Welt eine Willkommensnachricht konfigurieren, die beim Einloggen automatisch ausgespielt wird. Darstellungs-Modus wählbar: 💬 Chat oder 📺 Title (6 s / 10 s Einblendung in der Bildschirmmitte). Die Platzhalter `{player}`, `{world}` und `{server}` werden beim Versenden automatisch ersetzt.
 
 ### 💻 Konsole
 Live-Log mit Farb-Klassifizierung (Verbindungen, Fehler, Warnungen, Chat). Befehle direkt senden, Verlauf mit ↑/↓ navigieren, Zeilenanzahl wählbar. Schnellbefehle für `list`, `save all`, Tag/Nacht, Wetter und Ankündigungen.
