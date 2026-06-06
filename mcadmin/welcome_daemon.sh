@@ -26,7 +26,7 @@ while IFS= read -r line; do
             msg_line="${msg_line//\{player\}/$PLAYER}"
             msg_line="${msg_line//\{world\}/$WORLD}"
             msg_line="${msg_line//\{server\}/$SERVER_NAME}"
-            [ -p "$FIFO" ] && printf 'tell %s %s\n' "$PLAYER" "$msg_line" > "$FIFO"
+            [ -p "$FIFO" ] && printf 'say %s\n' "$msg_line" > "$FIFO"
             sleep 0.2
         done < "$WELCOME_FILE"
     fi
