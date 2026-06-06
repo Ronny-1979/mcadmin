@@ -34,8 +34,10 @@ try {
 
         // ── SERVER ────────────────────────────────────────────
         case 'status':           // Server-Status, Version, aktive Welt, Online-Spieler und Uptime
+            $running = server_is_running();
+            if ($running) ensure_welcome_daemon();
             echo json_encode([
-                'running'      => server_is_running(),
+                'running'      => $running,
                 'version'      => get_server_version(),
                 'active_world' => get_active_world(),
                 'players'      => get_online_players(),

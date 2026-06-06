@@ -1,6 +1,5 @@
 #!/bin/bash
-# Willkommens-Daemon: sendet konfigurierte Nachricht wenn Spieler dem Server beitritt.
-# Wird von server_start() gestartet und von server_stop() beendet.
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 LOG_FILE="/opt/minecraft-bedrock/logs/latest.log"
 FIFO="/opt/minecraft-bedrock/server.stdin"
@@ -11,7 +10,7 @@ PID_FILE="/tmp/mcadmin_welcome.pid"
 echo $$ > "$PID_FILE"
 trap 'rm -f "$PID_FILE"' EXIT
 
-tail -n 0 -F "$LOG_FILE" 2>/dev/null | while IFS= read -r line; do
+while IFS= read -r line; do
     if [[ "$line" =~ Player\ connected:\ ([^,]+), ]]; then
         PLAYER="${BASH_REMATCH[1]}"
         WORLD=$(jq -r '.active_world // empty' "$STATE_FILE" 2>/dev/null)
@@ -30,4 +29,4 @@ tail -n 0 -F "$LOG_FILE" 2>/dev/null | while IFS= read -r line; do
             sleep 0.2
         done < "$WELCOME_FILE"
     fi
-done
+done < <(tail -n 0 -F "$LOG_FILE" 2>/dev/null)

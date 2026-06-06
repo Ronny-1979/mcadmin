@@ -119,6 +119,19 @@ function stop_welcome_daemon(): void {
     }
 }
 
+// Startet den Willkommens-Daemon nur wenn er nicht bereits läuft (kein Kill)
+function ensure_welcome_daemon(): void {
+    $pidFile = '/tmp/mcadmin_welcome.pid';
+    if (file_exists($pidFile)) {
+        $pid = (int)trim(file_get_contents($pidFile));
+        if ($pid > 0 && file_exists('/proc/' . $pid)) return;
+        @unlink($pidFile);
+    }
+    $script = dirname(MC_STATE_FILE) . '/welcome_daemon.sh';
+    if (!file_exists($script)) return;
+    shell_exec('nohup bash ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+}
+
 // Liest die Willkommensnachricht einer Welt
 function get_welcome_message(string $world): string {
     $file = MC_WORLDS_DIR . '/' . $world . '/.mcadmin_welcome.txt';
