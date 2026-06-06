@@ -1,7 +1,7 @@
 #!/bin/bash
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-LOG_FILE="/opt/minecraft-bedrock/logs/latest.log"
+SERVICE_NAME="minecraft-bedrock"
 FIFO="/opt/minecraft-bedrock/server.stdin"
 STATE_FILE="/var/www/html/mcadmin/mcadmin_state.json"
 WORLDS_DIR="/opt/minecraft-bedrock/worlds"
@@ -30,4 +30,4 @@ while IFS= read -r line; do
             sleep 0.2
         done < "$WELCOME_FILE"
     fi
-done < <(tail -n 0 -F "$LOG_FILE" 2>/dev/null)
+done < <(journalctl -fu "$SERVICE_NAME" --output=cat -n 0 2>/dev/null)
