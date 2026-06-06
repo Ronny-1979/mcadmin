@@ -540,6 +540,36 @@ async function renameWorld(){
   if(r.success){closeModal('modal-rename-world');await refreshStatus();loadWorlds();}
 }
 
+// Rendert das Willkommens-Panel mit Modus-Buttons und Textarea
+function renderWelcomePanel(worldName, rawMsg, preserveText){
+  const panel=document.getElementById('wmsg-'+worldName);
+  if(!panel)return;
+  let wMode='say',wDuration=120;
+  const cm=rawMsg.match(/^#display:(\w+):(\d+)\n?/);
+  if(cm){wMode=cm[1];wDuration=parseInt(cm[2]);rawMsg=rawMsg.replace(/^#display:\w+:\d+\n?/,'');}
+  const msgText=preserveText!==undefined?preserveText:rawMsg;
+  const id='wmsg-ta-'+worldName;
+  const ms=(m,d)=>wMode===m&&(m==='say'||d===wDuration)?'background:var(--accent);color:#fff':'';
+  panel.innerHTML=`<div style="margin-top:8px">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Darstellung:
+      <button class="btn ghost xs" style="${ms('say',0)}" onclick="selectWelcomeMode('${e(worldName)}','say',0)">💬 Chat</button>
+      <button class="btn ghost xs" style="${ms('title',120)}" onclick="selectWelcomeMode('${e(worldName)}','title',120)">📺 Title 6s</button>
+      <button class="btn ghost xs" style="${ms('title',200)}" onclick="selectWelcomeMode('${e(worldName)}','title',200)">📺 Title 10s</button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Platzhalter:
+      <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{player}')">👤 {player}</button>
+      <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{world}')">🌍 {world}</button>
+      <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{server}')">🖥 {server}</button>
+    </div>
+    <textarea id="${id}" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;font-size:12px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)" placeholder="z.B. Willkommen, {player}! Viel Spaß auf {world}.">${e(msgText)}</textarea>
+    ${wMode==='title'?'<div style="font-size:10px;color:var(--text2);margin-top:2px">Zeile 1 = Haupttitel · Zeile 2 = Untertitel · weitere Zeilen im Chat</div>':''}
+    <div style="margin-top:6px;text-align:right">
+      <button class="btn primary xs" onclick="saveWelcomeMsg('${e(worldName)}')">💾 Speichern</button>
+    </div>
+  </div>`;
+  panel.dataset.wmode=wMode;
+  panel.dataset.wduration=wDuration;
+}
 // Öffnet/schließt das Willkommens-Nachrichten-Panel einer Welt
 async function toggleWelcomePanel(worldName){
   const panel=document.getElementById('wmsg-'+worldName);
@@ -549,27 +579,28 @@ async function toggleWelcomePanel(worldName){
   panel.innerHTML='<div class="dim xs2" style="padding:6px 0"><span class="spin">⟳</span> Lade...</div>';
   try{
     const data=await api('get_welcome_message',{world:worldName});
-    const id='wmsg-ta-'+worldName;
-    panel.innerHTML=`<div style="margin-top:8px">
-      <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Platzhalter:
-        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{player}')">👤 {player}</button>
-        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{world}')">🌍 {world}</button>
-        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{server}')">🖥 {server}</button>
-      </div>
-      <textarea id="${id}" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;font-size:12px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)" placeholder="z.B. Willkommen, {player}! Viel Spaß auf {world}.">${e(data.message||'')}</textarea>
-      <div style="margin-top:6px;text-align:right">
-        <button class="btn primary xs" onclick="saveWelcomeMsg('${e(worldName)}')">💾 Speichern</button>
-      </div>
-    </div>`;
+    renderWelcomePanel(worldName,data.message||'');
   }catch(err){
     panel.innerHTML='<div class="dim xs2" style="padding:6px 0">❌ Fehler beim Laden.</div>';
   }
 }
+// Wechselt den Darstellungsmodus (Chat / Title) und erhält den Textarea-Inhalt
+function selectWelcomeMode(worldName,mode,duration){
+  const ta=document.getElementById('wmsg-ta-'+worldName);
+  const cur=ta?ta.value:'';
+  const cfg=mode!=='say'?`#display:${mode}:${duration}\n`:'';
+  renderWelcomePanel(worldName,cfg+cur,cur);
+}
 // Speichert die Willkommensnachricht einer Welt
 async function saveWelcomeMsg(worldName){
   const ta=document.getElementById('wmsg-ta-'+worldName);
+  const panel=document.getElementById('wmsg-'+worldName);
   if(!ta)return;
-  const r=await api('save_welcome_message',{world:worldName,message:ta.value});
+  const mode=panel.dataset.wmode||'say';
+  const dur=parseInt(panel.dataset.wduration)||120;
+  let msg=ta.value;
+  if(mode!=='say') msg=`#display:${mode}:${dur}\n${msg}`;
+  const r=await api('save_welcome_message',{world:worldName,message:msg});
   toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
 }
 // Fügt einen Platzhalter an der Cursor-Position im Willkommens-Textarea ein

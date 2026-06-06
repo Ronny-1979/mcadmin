@@ -19,14 +19,38 @@ while IFS= read -r line; do
         [ -f "$WELCOME_FILE" ] || continue
         sleep 2
         SERVER_NAME=$(grep -m1 '^server-name=' "/opt/minecraft-bedrock/server.properties" 2>/dev/null | cut -d'=' -f2-)
+        DISPLAY_MODE="say"
+        DISPLAY_DURATION=120
+        CONFIG=$(head -1 "$WELCOME_FILE")
+        if [[ "$CONFIG" =~ ^#display:([a-z]+):([0-9]+)$ ]]; then
+            DISPLAY_MODE="${BASH_REMATCH[1]}"
+            DISPLAY_DURATION="${BASH_REMATCH[2]}"
+        fi
+        if [ "$DISPLAY_MODE" = "title" ] && [ -p "$FIFO" ]; then
+            printf 'title @a[name=%s] times 10 %d 10\n' "$PLAYER" "$DISPLAY_DURATION" > "$FIFO"
+            sleep 0.1
+        fi
+        MSG_LINE_NUM=0
         while IFS= read -r msg_line || [ -n "$msg_line" ]; do
             msg_line="${msg_line#"${msg_line%%[![:space:]]*}"}"
             msg_line="${msg_line%"${msg_line##*[![:space:]]}"}"
             [ -z "$msg_line" ] && continue
+            [[ "$msg_line" =~ ^#display: ]] && continue
             msg_line="${msg_line//\{player\}/$PLAYER}"
             msg_line="${msg_line//\{world\}/$WORLD}"
             msg_line="${msg_line//\{server\}/$SERVER_NAME}"
-            [ -p "$FIFO" ] && printf 'say %s\n' "$msg_line" > "$FIFO"
+            MSG_LINE_NUM=$((MSG_LINE_NUM + 1))
+            if [ "$DISPLAY_MODE" = "title" ] && [ -p "$FIFO" ]; then
+                if [ $MSG_LINE_NUM -eq 1 ]; then
+                    printf 'title @a[name=%s] title %s\n' "$PLAYER" "$msg_line" > "$FIFO"
+                elif [ $MSG_LINE_NUM -eq 2 ]; then
+                    printf 'title @a[name=%s] subtitle %s\n' "$PLAYER" "$msg_line" > "$FIFO"
+                else
+                    printf 'say %s\n' "$msg_line" > "$FIFO"
+                fi
+            else
+                printf 'say %s\n' "$msg_line" > "$FIFO"
+            fi
             sleep 0.2
         done < "$WELCOME_FILE"
     fi
