@@ -105,7 +105,7 @@ function start_welcome_daemon(): void {
     stop_welcome_daemon();
     $script = dirname(MC_STATE_FILE) . '/welcome_daemon.sh';
     if (!file_exists($script)) return;
-    shell_exec('nohup bash ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+    exec('setsid nohup bash ' . escapeshellarg($script) . ' < /dev/null > /dev/null 2>&1 &');
 }
 
 // Beendet den Willkommens-Daemon anhand von PID-Datei und Prozessname
@@ -129,7 +129,7 @@ function ensure_welcome_daemon(): void {
     }
     $script = dirname(MC_STATE_FILE) . '/welcome_daemon.sh';
     if (!file_exists($script)) return;
-    shell_exec('nohup bash ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+    exec('setsid nohup bash ' . escapeshellarg($script) . ' < /dev/null > /dev/null 2>&1 &');
 }
 
 // Liest die Willkommensnachricht einer Welt
