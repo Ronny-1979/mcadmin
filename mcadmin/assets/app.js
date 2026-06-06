@@ -403,9 +403,11 @@ async function loadWorlds(){
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="openRenameModal('${e(w.name)}')">✏️ Umbenennen</button>`:''}
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="document.getElementById('wld-pk-${e(w.name)}').click()">📦 Pack hochladen</button><input type="file" id="wld-pk-${e(w.name)}" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="uploadPackForWorld(this,'${e(w.name)}')">`:``}
           <button class="btn ghost xs" onclick="toggleInstalledPanel('${e(w.name)}')">📦 ${w.pack_count||0} Packs</button>
+          <button class="btn ghost xs" onclick="toggleWelcomePanel('${e(w.name)}')">💬 Willkommen</button>
           ${!(w.name===active&&G.srv.running)?`<button class="btn danger xs" onclick="delWorld('${e(w.name)}')">🗑 Löschen</button>`:''}
         </div>
         <div class="wip hidden" id="wip-${e(w.name)}"></div>
+        <div class="wip hidden" id="wmsg-${e(w.name)}"></div>
       </div>
       ${w.missing_packs_count>0?`<div class="miss-panel hidden" id="mpp-${e(w.name)}"></div>`:''}
     </div>`).join('');
@@ -536,6 +538,48 @@ async function renameWorld(){
   if(!nw){toast('Bitte neuen Namen eingeben','warn');return;}
   const r=await api('rename_world',{world:old,new_name:nw});toast(r.message,r.success?'success':'error');
   if(r.success){closeModal('modal-rename-world');await refreshStatus();loadWorlds();}
+}
+
+// Öffnet/schließt das Willkommens-Nachrichten-Panel einer Welt
+async function toggleWelcomePanel(worldName){
+  const panel=document.getElementById('wmsg-'+worldName);
+  if(!panel)return;
+  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
+  panel.classList.remove('hidden');
+  panel.innerHTML='<div class="dim xs2" style="padding:6px 0"><span class="spin">⟳</span> Lade...</div>';
+  try{
+    const data=await api('get_welcome_message',{world:worldName});
+    const id='wmsg-ta-'+worldName;
+    panel.innerHTML=`<div style="margin-top:8px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Platzhalter:
+        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{player}')">👤 {player}</button>
+        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{world}')">🌍 {world}</button>
+        <button class="btn ghost xs" onclick="insertWelcomePlaceholder('${e(worldName)}','{server}')">🖥 {server}</button>
+      </div>
+      <textarea id="${id}" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;font-size:12px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text)" placeholder="z.B. Willkommen, {player}! Viel Spaß auf {world}.">${e(data.message||'')}</textarea>
+      <div style="margin-top:6px;text-align:right">
+        <button class="btn primary xs" onclick="saveWelcomeMsg('${e(worldName)}')">💾 Speichern</button>
+      </div>
+    </div>`;
+  }catch(err){
+    panel.innerHTML='<div class="dim xs2" style="padding:6px 0">❌ Fehler beim Laden.</div>';
+  }
+}
+// Speichert die Willkommensnachricht einer Welt
+async function saveWelcomeMsg(worldName){
+  const ta=document.getElementById('wmsg-ta-'+worldName);
+  if(!ta)return;
+  const r=await api('save_welcome_message',{world:worldName,message:ta.value});
+  toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
+}
+// Fügt einen Platzhalter an der Cursor-Position im Willkommens-Textarea ein
+function insertWelcomePlaceholder(worldName,ph){
+  const ta=document.getElementById('wmsg-ta-'+worldName);
+  if(!ta)return;
+  const s=ta.selectionStart,end=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+ph+ta.value.slice(end);
+  ta.selectionStart=ta.selectionEnd=s+ph.length;
+  ta.focus();
 }
 
 // ═══ PROPS EDITOR ═════════════════════════════════════════

@@ -335,6 +335,22 @@ try {
             if ($saved) $_SESSION['admin_user'] = $newUser;
             echo json_encode(['success'=>$saved,'message'=>$saved?'Benutzername geändert':'Fehler beim Speichern']); break;
 
+        // ── WILLKOMMENSNACHRICHT ──────────────────────────────
+        case 'get_welcome_message':
+            $world = $_POST['world'] ?? $_GET['world'] ?? '';
+            if (!preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültiger Weltname']); break;
+            }
+            echo json_encode(['success'=>true,'message'=>get_welcome_message($world)]); break;
+
+        case 'save_welcome_message':
+            $world = $_POST['world'] ?? '';
+            if (!preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültiger Weltname']); break;
+            }
+            $msg = substr(str_replace("\r\n", "\n", str_replace("\0", '', $_POST['message'] ?? '')), 0, 2000);
+            echo json_encode(['success'=>save_welcome_message($world,$msg),'message'=>'Willkommensnachricht gespeichert']); break;
+
         default:
             http_response_code(400);
             echo json_encode(['success'=>false,'message'=>'Unbekannte Aktion: '.$action]);

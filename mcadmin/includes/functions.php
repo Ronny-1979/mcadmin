@@ -41,7 +41,10 @@ function server_start(): array {
     if ($activeWorld) apply_world_packs($activeWorld);
 
     exec('sudo systemctl start ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
-    if ($code === 0) discord_notify('server_start', '▶️ **Server gestartet**');
+    if ($code === 0) {
+        discord_notify('server_start', '▶️ **Server gestartet**');
+        start_welcome_daemon();
+    }
     return ['success' => $code === 0, 'output' => implode("\n", $out)];
 }
 
@@ -57,6 +60,7 @@ function kill_stale_server_procs(): void {
 function server_stop(): array {
     exec('sudo systemctl stop ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
     kill_stale_server_procs();
+    stop_welcome_daemon();
     if ($code === 0) discord_notify('server_stop', '⏹️ **Server gestoppt**');
     return ['success' => $code === 0, 'output' => implode("\n", $out)];
 }
@@ -74,6 +78,7 @@ function server_restart(): array {
         return ['success' => false, 'output' => implode("\n", $out)];
     }
     kill_stale_server_procs();
+    stop_welcome_daemon();
     $out2 = [];
     $code2 = 1;
     // Start and verify the server survived the first few seconds (port-conflict crashes happen within ~3 s).
@@ -86,12 +91,48 @@ function server_restart(): array {
         $active = trim(shell_exec('systemctl is-active ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>/dev/null') ?? '');
         if ($active === 'active') {
             discord_notify('server_start', '↺ **Server neu gestartet**');
+            start_welcome_daemon();
             return ['success' => true, 'output' => implode("\n", array_merge($out, $out2))];
         }
         exec('sudo systemctl stop ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1');
         kill_stale_server_procs();
     }
     return ['success' => false, 'output' => implode("\n", array_merge($out, $out2))];
+}
+
+// Startet den Willkommens-Daemon im Hintergrund (nohup)
+function start_welcome_daemon(): void {
+    stop_welcome_daemon();
+    $script = dirname(MC_STATE_FILE) . '/welcome_daemon.sh';
+    if (!file_exists($script)) return;
+    shell_exec('nohup bash ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+}
+
+// Beendet den Willkommens-Daemon anhand von PID-Datei und Prozessname
+function stop_welcome_daemon(): void {
+    shell_exec('pkill -f "welcome_daemon.sh" 2>/dev/null');
+    $pidFile = '/tmp/mcadmin_welcome.pid';
+    if (file_exists($pidFile)) {
+        $pid = (int)trim(file_get_contents($pidFile));
+        if ($pid > 0) shell_exec('pkill -P ' . $pid . ' 2>/dev/null');
+        @unlink($pidFile);
+    }
+}
+
+// Liest die Willkommensnachricht einer Welt
+function get_welcome_message(string $world): string {
+    $file = MC_WORLDS_DIR . '/' . $world . '/.mcadmin_welcome.txt';
+    if (!file_exists($file)) return '';
+    return file_get_contents($file) ?: '';
+}
+
+// Speichert die Willkommensnachricht einer Welt (leerer String löscht die Datei)
+function save_welcome_message(string $world, string $msg): bool {
+    $dir = MC_WORLDS_DIR . '/' . $world;
+    if (!is_dir($dir)) return false;
+    $file = $dir . '/.mcadmin_welcome.txt';
+    if (trim($msg) === '') { @unlink($file); return true; }
+    return file_put_contents($file, $msg) !== false;
 }
 
 // Sendet einen Befehl an die laufende Server-Konsole via FIFO, screen oder tmux
