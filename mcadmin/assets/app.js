@@ -403,7 +403,7 @@ async function loadWorlds(){
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="openRenameModal('${e(w.name)}')">✏️ Umbenennen</button>`:''}
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="document.getElementById('wld-pk-${e(w.name)}').click()">📦 Pack hochladen</button><input type="file" id="wld-pk-${e(w.name)}" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="uploadPackForWorld(this,'${e(w.name)}')">`:``}
           <button class="btn ghost xs" onclick="toggleInstalledPanel('${e(w.name)}')">📦 ${w.pack_count||0} Packs</button>
-          ${w.name!==active?`<button class="btn ghost xs" onclick="toggleWelcomePanel('${e(w.name)}')">💬 Willkommen</button>`:''}
+          <button class="btn ghost xs" onclick="toggleWelcomePanel('${e(w.name)}')">💬 Willkommen</button>
           ${!(w.name===active&&G.srv.running)?`<button class="btn danger xs" onclick="delWorld('${e(w.name)}')">🗑 Löschen</button>`:''}
         </div>
         <div class="wip hidden" id="wip-${e(w.name)}"></div>

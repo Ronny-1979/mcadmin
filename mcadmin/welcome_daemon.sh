@@ -17,6 +17,7 @@ while IFS= read -r line; do
         [ -z "$WORLD" ] && continue
         WELCOME_FILE="$WORLDS_DIR/$WORLD/.mcadmin_welcome.txt"
         [ -f "$WELCOME_FILE" ] || continue
+        sleep 2
         SERVER_NAME=$(grep -m1 '^server-name=' "/opt/minecraft-bedrock/server.properties" 2>/dev/null | cut -d'=' -f2-)
         while IFS= read -r msg_line || [ -n "$msg_line" ]; do
             msg_line="${msg_line#"${msg_line%%[![:space:]]*}"}"
