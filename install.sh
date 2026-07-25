@@ -377,6 +377,16 @@ PANEL_SCRIPT_EOF
         systemctl daemon-reload
         ok "Service-Datei migriert: KillMode=control-group (Port-Fix)"
     fi
+    for phpini in "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/8.2/apache2/php.ini" "/etc/php/8.1/apache2/php.ini" "/etc/php/php.ini" "/etc/php.ini"; do
+        if [ -f "$phpini" ]; then
+            # Debian/Ubuntu räumen Session-Dateien per Cron nach session.gc_maxlifetime auf,
+            # unabhängig vom Panel-eigenen ini_set() zur Laufzeit — auf 1 Jahr hochsetzen,
+            # damit angemeldete Sitzungen nicht nach ~24 Min. Inaktivität verschwinden.
+            sed -i 's/^session.gc_maxlifetime.*/session.gc_maxlifetime = 31536000/' "$phpini"
+            ok "Session-Lebensdauer angepasst: $phpini"; break
+        fi
+    done
+
     ensure_web_user_journal_access
     if $JOURNAL_ACCESS_CHANGED; then
         systemctl restart "${APACHE_SERVICE}" 2>/dev/null || true
@@ -1077,6 +1087,10 @@ for phpini in "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/8.2/apache2/php.in
         sed -i 's/^post_max_size.*/post_max_size = 512M/' "$phpini"
         sed -i 's/^max_execution_time.*/max_execution_time = 300/' "$phpini"
         sed -i 's/^memory_limit.*/memory_limit = 256M/' "$phpini"
+        # Debian/Ubuntu räumen Session-Dateien per Cron nach session.gc_maxlifetime auf,
+        # unabhängig vom Panel-eigenen ini_set() zur Laufzeit — auf 1 Jahr hochsetzen,
+        # damit angemeldete Sitzungen nicht nach ~24 Min. Inaktivität verschwinden.
+        sed -i 's/^session.gc_maxlifetime.*/session.gc_maxlifetime = 31536000/' "$phpini"
         ok "PHP-Limits angepasst: $phpini"; break
     fi
 done

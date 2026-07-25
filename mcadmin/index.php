@@ -1,9 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/functions.php';
-if ($_SERVER['REQUEST_METHOD']==='POST' && !empty($_POST['remember'])) {
-    session_set_cookie_params(30 * 24 * 60 * 60);
-}
 session_start();
 
 $settings = load_settings();
@@ -162,10 +159,7 @@ try {
     <?php endif; ?>
     <div class="fr"><label>Benutzername</label><input type="text" name="username" autocomplete="username"></div>
     <div class="fr"><label>Passwort</label><input type="password" name="password" autofocus autocomplete="current-password" placeholder="Passwort eingeben..."></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <input type="checkbox" name="remember" id="lrem" value="1" style="width:auto;accent-color:#5db85c;cursor:pointer">
-      <label for="lrem" style="margin:0;cursor:pointer;font-size:12px;color:#444">Angemeldet bleiben (30 Tage)</label>
-    </div>
+    <div class="dim xs2" style="margin-bottom:16px">Du bleibst dauerhaft angemeldet, bis du dich abmeldest.</div>
     <button type="submit" class="btn primary" style="width:100%;justify-content:center;padding:10px">Anmelden</button>
   </form>
 </div>
