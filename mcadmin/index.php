@@ -291,6 +291,8 @@ try {
     </div>
     <div class="content">
 
+    <div id="exp-banner" class="hidden"></div>
+
     <!-- ═══ DASHBOARD ═══ -->
     <div id="page-dashboard" class="pc2">
       <?php if($default_creds): ?>

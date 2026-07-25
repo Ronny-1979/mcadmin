@@ -3259,6 +3259,61 @@ function get_log_lines(int $lines = 100, int $offset = 0): array {
     return ['lines'=>$slice,'total'=>$total,'source'=>basename($logFile)];
 }
 
+// Bekannte "Experiment X wird benötigt"-Meldungen aus dem Server-Log, jeweils der Anzeigename
+// wie er im Log auftaucht → interner level.dat-Key. Bisher ist nur die Beta-APIs-Abhängigkeits-
+// prüfung von Scripting-Packs bekannt zuverlässig als klare Fehlerzeile geloggt; andere Experimente
+// scheitern meist ohne eindeutige Meldung und werden deshalb bewusst NICHT geraten.
+function experiment_log_aliases(): array {
+    return [
+        'beta apis' => 'gametest',
+    ];
+}
+
+// Durchsucht die aktuellste Startphase des Server-Logs nach bekannten "Experiment X fehlt"-
+// Meldungen und meldet, welches Experiment für die aktive Welt noch fehlt. Bereits aktivierte
+// Experimente (Nutzer hat es schon behoben, aber noch nicht neugestartet) werden nicht mehr
+// gemeldet, ebenso Meldungen aus einem früheren Serverstart vor dem letzten "Starting Server".
+function detect_missing_experiments(): array {
+    $activeWorld = get_active_world();
+    if (!$activeWorld) return [];
+
+    $log   = get_log_lines(400);
+    $lines = $log['lines'] ?? [];
+    if (!$lines) return [];
+
+    // Nur ab dem letzten Serverstart betrachten, keine Meldungen aus älteren Läufen
+    $startIdx = 0;
+    foreach ($lines as $i => $line) {
+        if (stripos($line, 'Starting Server') !== false) $startIdx = $i;
+    }
+    $lines = array_slice($lines, $startIdx);
+
+    $aliases = experiment_log_aliases();
+    $found   = []; // key => Pack-Name
+
+    foreach ($lines as $line) {
+        if (!preg_match(
+            '/\[Scripting\]\s*Plugin\s*\[(.+)\]\s*-\s*requesting dependency on beta APIs\s*\[.+?\],\s*but the (.+?) experiment is not enabled\.?/i',
+            $line, $m
+        )) continue;
+
+        $key = $aliases[strtolower(trim($m[2]))] ?? null;
+        if ($key === null) continue; // unbekanntes/neues Muster -> lieber nichts anzeigen als raten
+        if (!isset($found[$key])) $found[$key] = trim($m[1]);
+    }
+    if (!$found) return [];
+
+    $labels      = experiment_labels();
+    $currentlyOn = array_column(get_world_experiment_toggles($activeWorld), 'enabled', 'key');
+
+    $result = [];
+    foreach ($found as $key => $packName) {
+        if (!empty($currentlyOn[$key])) continue;
+        $result[] = ['key' => $key, 'label' => $labels[$key] ?? $key, 'pack' => $packName, 'world' => $activeWorld];
+    }
+    return $result;
+}
+
 // Sendet einen Befehl an die Server-Konsole via FIFO, screen, tmux oder stdin
 function console_send(string $cmd): array {
     $cmd = trim($cmd);
