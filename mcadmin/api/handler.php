@@ -40,11 +40,12 @@ try {
             $running = server_is_running();
             if ($running) ensure_welcome_daemon();
             echo json_encode([
-                'running'      => $running,
-                'version'      => get_server_version(),
-                'active_world' => get_active_world(),
-                'players'      => get_online_players(),
-                'uptime'       => get_server_uptime(),
+                'running'            => $running,
+                'version'            => get_server_version(),
+                'active_world'       => get_active_world(),
+                'players'            => get_online_players(),
+                'uptime'             => get_server_uptime(),
+                'experiment_issues'  => detect_missing_experiments(),
             ]); break;
         case 'server_start':   echo json_encode(server_start());   break;  // Startet den Minecraft-Server
         case 'server_stop':    echo json_encode(server_stop());    break;  // Stoppt den Minecraft-Server

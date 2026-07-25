@@ -6,6 +6,7 @@ const G={
   propsWorld:null,propsData:{},
   conPaused:false,conTimer:null,conActive:false,conHist:[],conHistIdx:-1,conLines:100,
   srvWasRunning:false,
+  dismissedExp:new Set(),
 };
 
 // ═══ API ══════════════════════════════════════════════════
@@ -103,7 +104,66 @@ async function refreshStatus(){
     renderPlayers(s.players);
     if(s.running&&!G.srvWasRunning&&G.tab==='worlds')loadWorlds();
     G.srvWasRunning=s.running;
+    renderExpBanner(s.experiment_issues||[]);
   }catch(e){}
+}
+
+// ═══ EXPERIMENT-HINWEISE ═══════════════════════════════════
+// Zeigt einen Hinweis-Banner, wenn das Server-Log erkennen lässt, dass ein Pack ein noch
+// nicht aktiviertes Experiment (z.B. Beta APIs) benötigt. Läuft bei jedem Status-Poll mit.
+function renderExpBanner(issues){
+  const el=document.getElementById('exp-banner');
+  if(!el)return;
+  const pending=issues.filter(x=>!G.dismissedExp.has(x.world+'|'+x.key));
+  if(!pending.length){el.classList.add('hidden');el.innerHTML='';return;}
+  el.classList.remove('hidden');
+  el.innerHTML=pending.map(x=>`
+    <div class="ub" style="margin-bottom:8px">
+      <div>⚗️</div>
+      <div style="flex:1;min-width:0">
+        <strong style="color:var(--yellow)">Experiment benötigt:</strong>
+        Pack „${e(x.pack)}" in Welt „${e(x.world)}" braucht <strong>${e(x.label)}</strong>, sonst bricht es beim Start mit einem Fehler ab.
+      </div>
+      <div class="fx g6" style="flex-shrink:0">
+        <button class="btn warn sm" onclick="activateExpIssue('${e(x.world)}','${e(x.key)}','${e(x.label)}',this)">Aktivieren &amp; Neustart</button>
+        <button class="btn ghost sm" onclick="dismissExpIssue('${e(x.world)}','${e(x.key)}')">Später</button>
+      </div>
+    </div>`).join('');
+}
+// Blendet einen Experiment-Hinweis für die laufende Sitzung aus (kein Server-State, nur UI)
+function dismissExpIssue(world,key){
+  G.dismissedExp.add(world+'|'+key);
+  refreshStatus();
+}
+// Stoppt den Server, aktiviert das benötigte Experiment und startet ihn wieder — mit Bestätigung
+// durch den Klick selbst (keine zusätzliche Rückfrage), da der Nutzer das Pack ja beheben will.
+async function activateExpIssue(world,key,label,btn){
+  if(btn)btn.disabled=true;
+  try{
+    toast('Stoppe Server, um „'+label+'" zu aktivieren...','info');
+    await api('server_stop');
+    for(let i=0;i<10;i++){
+      const s=await api('status');
+      if(!s.running)break;
+      await new Promise(r=>setTimeout(r,1000));
+    }
+    const r=await api('toggle_world_experiment',{world,key,enable:'1'});
+    if(!r.success){
+      toast(r.message||'Aktivieren fehlgeschlagen','error');
+      await api('server_start');
+      if(btn)btn.disabled=false;
+      return;
+    }
+    G.dismissedExp.add(world+'|'+key);
+    toast('„'+label+'" aktiviert — starte Server...','success');
+    const rr=await api('server_start');
+    toast(rr.success?'Server gestartet':'Start fehlgeschlagen: '+(rr.output||''),rr.success?'success':'error');
+  }catch(err){
+    toast('Fehler: '+err.message,'error');
+    if(btn)btn.disabled=false;
+  }finally{
+    setTimeout(refreshStatus,1500);
+  }
 }
 
 // Rendert die Online-Spieler-Liste mit Aktions-Buttons (OP, Kick, Whitelist)
