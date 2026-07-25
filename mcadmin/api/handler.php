@@ -169,6 +169,18 @@ try {
             $ok     = toggle_pack_for_world($world,$uuid,$type,$enable);
             if ($ok) apply_world_packs($world);
             echo json_encode(['success'=>$ok]); break;
+
+        // ── EXPERIMENTE ───────────────────────────────────────
+        case 'get_world_experiments':  // Gibt den An/Aus-Status aller bekannten Experimente einer Welt zurück
+            $world = $_POST['world'] ?? $_GET['world'] ?? '';
+            if (!preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world)) { echo json_encode(['success'=>false,'message'=>'Ungültiger Weltname']); break; }
+            echo json_encode(['experiments'=>get_world_experiment_toggles($world)]); break;
+        case 'toggle_world_experiment':  // Aktiviert/deaktiviert ein Experiment (z.B. Beta APIs) für eine Welt
+            $world  = $_POST['world']??'';
+            $key    = $_POST['key']??'';
+            $enable = filter_var($_POST['enable']??false, FILTER_VALIDATE_BOOLEAN);
+            if (!preg_match('/^[a-zA-Z0-9_\- ]{1,64}$/', $world)) { echo json_encode(['success'=>false,'message'=>'Ungültiger Weltname']); break; }
+            echo json_encode(set_world_experiment($world,$key,$enable)); break;
         case 'upload_pack':     // Installiert ein hochgeladenes Pack (.mcpack/.mcaddon/.zip)
             if (!isset($_FILES['pack'])||$_FILES['pack']['error']!==UPLOAD_ERR_OK) {
                 echo json_encode(['success'=>false,'message'=>'Upload fehlgeschlagen']); break;

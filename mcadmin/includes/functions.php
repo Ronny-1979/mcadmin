@@ -773,7 +773,7 @@ function install_world(string $tmpPath, string $originalName, bool $force = fals
                 }
             }
             foreach (['commandsEnabled', 'ForceGameType', 'commandblocksenabled', 'useMsaGamertagsOnly',
-                      'gametest', 'upcoming_creator_features', 'holiday_creator_features',
+                      'gametest', 'beta_apis', 'upcoming_creator_features', 'holiday_creator_features',
                       'experimental_molang_features', 'cameras', 'custom_biomes',
                       'data_driven_items', 'data_driven_biomes', 'y_2025_drop_1',
                       'experimental_creator_cameras', 'jigsaw_structures',
@@ -1161,23 +1161,8 @@ if (file_exists($destLevelDat)) {
     }
 
     // Aktive Experimente melden
-    $expLabels = [
-        'gametest'                      => 'GameTest Framework',
-        'upcoming_creator_features'     => 'Upcoming Creator Features',
-        'holiday_creator_features'      => 'Holiday Creator Features',
-        'experimental_molang_features'  => 'Experimental Molang',
-        'cameras'                       => 'Cameras',
-        'experimental_creator_cameras'  => 'Creator Cameras',
-        'custom_biomes'                 => 'Custom Biomes',
-        'data_driven_items'             => 'Data-Driven Items',
-        'data_driven_biomes'            => 'Data-Driven Biomes',
-        'jigsaw_structures'             => 'Jigsaw Structures',
-        'villager_trades_rebalance'     => 'Villager Trade Rebalancing',
-        'y_2025_drop_1'                 => 'Beta-APIs (2025 Drop 1)',
-        'y_2025_drop_3'                 => 'Beta-APIs (2025 Drop 3)',
-    ];
     $activeExps = [];
-    foreach ($expLabels as $key => $label) {
+    foreach (experiment_labels() as $key => $label) {
         if (!empty($lvlSettings[$key])) $activeExps[] = $label;
     }
     if ($activeExps) {
@@ -1191,6 +1176,27 @@ if (file_exists($destLevelDat)) {
             'experiments' => $activeExps, 'missing_packs' => $missingPacks];
 }
 
+// Zentrale Liste aller bekannten Welt-Experimente (level.dat Root-Flags), inkl. Anzeigename.
+// Wird sowohl fürs Erkennen aktiver Experimente als auch fürs Umschalten im Panel genutzt.
+function experiment_labels(): array {
+    return [
+        'gametest'                      => 'GameTest Framework',
+        'beta_apis'                     => 'Beta APIs',
+        'upcoming_creator_features'     => 'Upcoming Creator Features',
+        'holiday_creator_features'      => 'Holiday Creator Features (entfernt ab BDS 1.21.20)',
+        'experimental_molang_features'  => 'Experimental Molang',
+        'cameras'                       => 'Cameras',
+        'experimental_creator_cameras'  => 'Creator Cameras',
+        'custom_biomes'                 => 'Custom Biomes',
+        'data_driven_items'             => 'Data-Driven Items',
+        'data_driven_biomes'            => 'Data-Driven Biomes',
+        'jigsaw_structures'             => 'Jigsaw Structures',
+        'villager_trades_rebalance'     => 'Villager Trade Rebalancing',
+        'y_2025_drop_1'                 => 'Beta-APIs (2025 Drop 1)',
+        'y_2025_drop_3'                 => 'Beta-APIs (2025 Drop 3)',
+    ];
+}
+
 // Liest Experiment-Flags aus einer level.dat und gibt aktive Labels zurück
 function get_world_experiments(string $worldPath): array {
     $levelDat = $worldPath . '/level.dat';
@@ -1198,23 +1204,8 @@ function get_world_experiments(string $worldPath): array {
     $raw = (string)file_get_contents($levelDat);
     if (strlen($raw) <= 8) return [];
     $nbt = substr($raw, 8);
-    $expLabels = [
-        'gametest'                     => 'GameTest',
-        'upcoming_creator_features'    => 'Creator Features',
-        'holiday_creator_features'     => 'Holiday Features (entfernt ab BDS 1.21.20)',
-        'experimental_molang_features' => 'Molang',
-        'cameras'                      => 'Cameras',
-        'experimental_creator_cameras' => 'Creator Cameras',
-        'custom_biomes'                => 'Custom Biomes',
-        'data_driven_items'            => 'Data-Driven Items',
-        'data_driven_biomes'           => 'Data-Driven Biomes',
-        'jigsaw_structures'            => 'Jigsaw Structures',
-        'villager_trades_rebalance'    => 'Villager Trades',
-        'y_2025_drop_1'                => 'Beta-APIs Drop 1',
-        'y_2025_drop_3'                => 'Beta-APIs Drop 3',
-    ];
     $active = [];
-    foreach ($expLabels as $key => $label) {
+    foreach (experiment_labels() as $key => $label) {
         $pat = "\x01" . pack('v', strlen($key)) . $key;
         $pos = strpos($nbt, $pat);
         if ($pos !== false) {
@@ -1223,6 +1214,88 @@ function get_world_experiments(string $worldPath): array {
         }
     }
     return $active;
+}
+
+// Setzt oder löscht eine TAG_Byte-Flagge auf Root-Ebene einer level.dat-NBT-Payload (ohne 8-Byte-Header).
+// Existiert das Tag bereits, wird nur der Wert überschrieben (feste Größe, kein Resize nötig).
+// Fehlt es und $val ist true, wird ein neues TAG_Byte direkt vor dem abschließenden Root-TAG_End
+// (0x00, letztes Byte der Payload) eingefügt — die Payload wird dadurch länger.
+function nbt_set_root_byte_flag(string $nbt, string $tag, bool $val): string {
+    $pat = "\x01" . pack('v', strlen($tag)) . $tag;
+    $pos = strpos($nbt, $pat);
+    if ($pos !== false) {
+        $off = $pos + strlen($pat);
+        if (strlen($nbt) > $off) $nbt[$off] = $val ? "\x01" : "\x00";
+        return $nbt;
+    }
+    // Tag fehlt: nichts zu deaktivieren, und ohne erkennbares Root-TAG_End nicht sicher einfügbar.
+    if (!$val || substr($nbt, -1) !== "\x00") return $nbt;
+    return substr($nbt, 0, -1) . "\x01" . pack('v', strlen($tag)) . $tag . "\x01" . "\x00";
+}
+
+// Gibt für jedes bekannte Experiment den aktuellen An/Aus-Status einer Welt zurück (für den Umschalt-Dialog)
+function get_world_experiment_toggles(string $worldName): array {
+    $levelDat = MC_WORLDS_DIR . '/' . $worldName . '/level.dat';
+    $raw = file_exists($levelDat) ? (string)file_get_contents($levelDat) : '';
+    $nbt = strlen($raw) > 8 ? substr($raw, 8) : '';
+    $out = [];
+    foreach (experiment_labels() as $key => $label) {
+        $enabled = false;
+        if ($nbt !== '') {
+            $pat = "\x01" . pack('v', strlen($key)) . $key;
+            $pos = strpos($nbt, $pat);
+            if ($pos !== false) {
+                $off = $pos + strlen($pat);
+                $enabled = strlen($nbt) > $off && ord($nbt[$off]) !== 0;
+            }
+        }
+        $out[] = ['key' => $key, 'label' => $label, 'enabled' => $enabled];
+    }
+    return $out;
+}
+
+// Aktiviert/deaktiviert ein Welt-Experiment direkt in der level.dat, z.B. "Beta APIs" für
+// Behavior Packs, die @minecraft/server-*-beta-Module benötigen (bisher nur manuell im
+// Bedrock-Client unter Welt-Einstellungen → Experimente möglich).
+// BDS liest diese Flags nur beim Laden der Welt — Änderungen wirken erst nach einem Neustart.
+function set_world_experiment(string $worldName, string $key, bool $enable): array {
+    $labels = experiment_labels();
+    if (!array_key_exists($key, $labels)) {
+        return ['success' => false, 'message' => 'Unbekanntes Experiment'];
+    }
+    $levelDat = MC_WORLDS_DIR . '/' . $worldName . '/level.dat';
+    if (!file_exists($levelDat)) {
+        return ['success' => false, 'message' => 'level.dat nicht gefunden'];
+    }
+
+    // BDS hält level.dat während des Betriebs im Speicher und überschreibt unsere Änderung
+    // beim nächsten Autosave wieder — deshalb nur erlauben, wenn die Welt gerade nicht läuft.
+    if ($worldName === get_active_world() && server_is_running()) {
+        return ['success' => false, 'message' => 'Server läuft gerade auf dieser Welt — bitte zuerst stoppen, Experiment umschalten und danach wieder starten.'];
+    }
+
+    $raw = (string)file_get_contents($levelDat);
+    if (strlen($raw) <= 8) {
+        return ['success' => false, 'message' => 'level.dat ungültig'];
+    }
+
+    $nbt = nbt_set_root_byte_flag(substr($raw, 8), $key, $enable);
+    if ($enable) {
+        $nbt = nbt_set_root_byte_flag($nbt, 'experiments_ever_used', true);
+        $nbt = nbt_set_root_byte_flag($nbt, 'saved_with_toggled_experiments', true);
+    }
+    $newHeader = substr($raw, 0, 4) . pack('V', strlen($nbt));
+
+    @copy($levelDat, $levelDat . '.mcadmin_bak');
+    if (file_put_contents($levelDat, $newHeader . $nbt) === false) {
+        return ['success' => false, 'message' => 'Schreibfehler beim Speichern der level.dat'];
+    }
+
+    $label = $labels[$key];
+    return [
+        'success' => true,
+        'message' => ($enable ? "„{$label}“ aktiviert" : "„{$label}“ deaktiviert") . ' — wird beim nächsten Start dieser Welt wirksam.',
+    ];
 }
 
 // Gibt eine Liste aller Welt-Ordner mit Name, Größe und Properties-Status zurück
