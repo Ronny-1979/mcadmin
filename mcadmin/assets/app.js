@@ -414,10 +414,12 @@ async function loadWorlds(){
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="openRenameModal('${e(w.name)}')">✏️ Umbenennen</button>`:''}
           ${!(w.name===active&&G.srv.running)?`<button class="btn ghost xs" onclick="document.getElementById('wld-pk-${e(w.name)}').click()">📦 Pack hochladen</button><input type="file" id="wld-pk-${e(w.name)}" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="uploadPackForWorld(this,'${e(w.name)}')">`:``}
           <button class="btn ghost xs" onclick="toggleInstalledPanel('${e(w.name)}')">📦 ${w.pack_count||0} Packs</button>
+          <button class="btn ghost xs" onclick="toggleExperimentsPanel('${e(w.name)}')">🧪 Experimente</button>
           <button class="btn ghost xs" onclick="toggleWelcomePanel('${e(w.name)}')">💬 Willkommen</button>
           ${!(w.name===active&&G.srv.running)?`<button class="btn danger xs" onclick="delWorld('${e(w.name)}')">🗑 Löschen</button>`:''}
         </div>
         <div class="wip hidden" id="wip-${e(w.name)}"></div>
+        <div class="wip hidden" id="expp-${e(w.name)}"></div>
         <div class="wip hidden" id="wmsg-${e(w.name)}"></div>
       </div>
       ${w.missing_packs_count>0?`<div class="miss-panel hidden" id="mpp-${e(w.name)}"></div>`:''}
@@ -492,6 +494,36 @@ async function toggleInstalledPanel(worldName){
       </div>`).join('')}
     </div>`;
   }catch(err){panel.innerHTML='<div class="dim xs2" style="padding:6px 0">❌ Fehler beim Laden.</div>';}
+}
+// Öffnet/schließt das Panel mit den umschaltbaren Experimenten einer Welt (z.B. Beta APIs)
+async function toggleExperimentsPanel(worldName){
+  const panel=document.getElementById('expp-'+worldName);
+  if(!panel)return;
+  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return;}
+  panel.classList.remove('hidden');
+  panel.innerHTML='<div class="dim xs2" style="padding:6px 0"><span class="spin">⟳</span> Lade...</div>';
+  try{
+    const data=await api('get_world_experiments',{world:worldName});
+    const list=data.experiments||[];
+    panel.innerHTML=`<div style="margin-top:8px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px">Experimente (${e(worldName)}):</div>
+      <div class="dim xs2" style="margin-bottom:8px">Manche Packs (z.B. Scripting-Addons) benötigen ein bestimmtes Experiment, sonst brechen sie beim Start mit einem Fehler ab. Änderungen wirken erst nach einem Neustart dieser Welt.</div>
+      ${list.map(x=>`<div class="pkc">
+        <div style="flex:1;min-width:0">
+          <div class="pkn">${e(x.label)}</div>
+        </div>
+        <label class="tgl"><input type="checkbox" ${x.enabled?'checked':''}
+          onchange="toggleWorldExperiment('${e(worldName)}','${e(x.key)}',this.checked,'${e(x.label)}',this)">
+          <span class="tsl"></span></label>
+      </div>`).join('')}
+    </div>`;
+  }catch(err){panel.innerHTML='<div class="dim xs2" style="padding:6px 0">❌ Fehler beim Laden.</div>';}
+}
+// Aktiviert/deaktiviert ein Experiment (z.B. Beta APIs) für eine Welt
+async function toggleWorldExperiment(worldName,key,checked,label,cb){
+  const r=await api('toggle_world_experiment',{world:worldName,key,enable:checked?'1':'0'});
+  toast(r.message||(r.success?(checked?label+' aktiviert':label+' deaktiviert'):'Fehler'),r.success?'success':'error');
+  if(!r.success&&cb)cb.checked=!checked;
 }
 // Aktiviert/deaktiviert ein Pack für eine Welt direkt aus dem World-Panel
 async function togglePkWorld(worldName,uuid,type,checked,name){
