@@ -773,7 +773,7 @@ function install_world(string $tmpPath, string $originalName, bool $force = fals
                 }
             }
             foreach (['commandsEnabled', 'ForceGameType', 'commandblocksenabled', 'useMsaGamertagsOnly',
-                      'gametest', 'beta_apis', 'upcoming_creator_features', 'holiday_creator_features',
+                      'gametest', 'upcoming_creator_features', 'holiday_creator_features',
                       'experimental_molang_features', 'cameras', 'custom_biomes',
                       'data_driven_items', 'data_driven_biomes', 'y_2025_drop_1',
                       'experimental_creator_cameras', 'jigsaw_structures',
@@ -1180,8 +1180,9 @@ if (file_exists($destLevelDat)) {
 // Wird sowohl fürs Erkennen aktiver Experimente als auch fürs Umschalten im Panel genutzt.
 function experiment_labels(): array {
     return [
-        'gametest'                      => 'GameTest Framework',
-        'beta_apis'                     => 'Beta APIs',
+        // Client zeigt diesen Schalter seit einigen Versionen als "Beta APIs" an — der NBT-Key
+        // heißt aber weiterhin "gametest" (alter Name aus der GameTest-Framework-Ära).
+        'gametest'                      => 'Beta APIs (GameTest Framework)',
         'upcoming_creator_features'     => 'Upcoming Creator Features',
         'holiday_creator_features'      => 'Holiday Creator Features (entfernt ab BDS 1.21.20)',
         'experimental_molang_features'  => 'Experimental Molang',
