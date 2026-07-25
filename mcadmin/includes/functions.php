@@ -1234,6 +1234,82 @@ function nbt_set_root_byte_flag(string $nbt, string $tag, bool $val): string {
     return substr($nbt, 0, -1) . "\x01" . pack('v', strlen($tag)) . $tag . "\x01" . "\x00";
 }
 
+// Sucht ab $bodyStart (erstes Byte nach dem Namen einer TAG_Compound) deren eigenes TAG_End.
+// Kann nur einfache, flache Kind-Tags überspringen (Byte/Short/Int/Long/Float/Double/String/
+// ByteArray/IntArray/LongArray) — bei einer verschachtelten List/Compound oder einem unbekannten
+// Typ wird null zurückgegeben, um keine falschen Annahmen über den Aufbau zu treffen.
+function nbt_find_compound_end(string $nbt, int $bodyStart): ?int {
+    $off = $bodyStart;
+    $len = strlen($nbt);
+    while ($off < $len) {
+        $type = ord($nbt[$off]);
+        if ($type === 0x00) return $off; // TAG_End dieses Compounds
+        if ($off + 3 > $len) return null;
+        $nameLen = unpack('v', substr($nbt, $off + 1, 2))[1];
+        $valOff  = $off + 3 + $nameLen;
+        switch ($type) {
+            case 0x01: $size = 1; break; // Byte
+            case 0x02: $size = 2; break; // Short
+            case 0x03: $size = 4; break; // Int
+            case 0x04: $size = 8; break; // Long
+            case 0x05: $size = 4; break; // Float
+            case 0x06: $size = 8; break; // Double
+            case 0x07: // ByteArray
+                if ($valOff + 4 > $len) return null;
+                $size = 4 + unpack('V', substr($nbt, $valOff, 4))[1];
+                break;
+            case 0x08: // String
+                if ($valOff + 2 > $len) return null;
+                $size = 2 + unpack('v', substr($nbt, $valOff, 2))[1];
+                break;
+            case 0x0B: // IntArray
+                if ($valOff + 4 > $len) return null;
+                $size = 4 + 4 * unpack('V', substr($nbt, $valOff, 4))[1];
+                break;
+            case 0x0C: // LongArray
+                if ($valOff + 4 > $len) return null;
+                $size = 4 + 8 * unpack('V', substr($nbt, $valOff, 4))[1];
+                break;
+            default:
+                return null; // List/Compound oder unbekannter Typ — sicherheitshalber abbrechen
+        }
+        $off = $valOff + $size;
+    }
+    return null;
+}
+
+// Setzt ein Experiment-Flag. Existiert das TAG_Byte bereits (egal wo), wird nur der Wert
+// geflippt. Fehlt es, gehört es korrekterweise in die verschachtelte Root-Compound "experiments"
+// (siehe Bedrock-Wiki „Enabling Experiments by Editing NBT") — nicht direkt auf Root-Ebene, wie
+// eine frühere Version dieser Funktion es fälschlich getan hat. Existiert "experiments" selbst
+// noch nicht, wird die Compound neu angelegt.
+function nbt_set_experiment_flag(string $nbt, string $key, bool $enable): string {
+    $pat = "\x01" . pack('v', strlen($key)) . $key;
+    $pos = strpos($nbt, $pat);
+    if ($pos !== false) {
+        $off = $pos + strlen($pat);
+        if (strlen($nbt) > $off) $nbt[$off] = $enable ? "\x01" : "\x00";
+        return $nbt;
+    }
+    if (!$enable) return $nbt; // nichts zu deaktivieren
+
+    $newFlag = "\x01" . pack('v', strlen($key)) . $key . "\x01";
+    $expPat  = "\x0a" . pack('v', strlen('experiments')) . 'experiments';
+    $expPos  = strpos($nbt, $expPat);
+    if ($expPos !== false) {
+        $bodyStart = $expPos + strlen($expPat);
+        $end = nbt_find_compound_end($nbt, $bodyStart);
+        if ($end !== null) {
+            return substr($nbt, 0, $end) . $newFlag . substr($nbt, $end);
+        }
+    }
+    // "experiments"-Compound fehlt (oder Aufbau nicht sicher auflösbar) → als neue
+    // Root-Compound anlegen, direkt vor dem abschließenden Root-TAG_End.
+    if (substr($nbt, -1) !== "\x00") return $nbt;
+    $newCompound = $expPat . $newFlag . "\x00";
+    return substr($nbt, 0, -1) . $newCompound . "\x00";
+}
+
 // Gibt für jedes bekannte Experiment den aktuellen An/Aus-Status einer Welt zurück (für den Umschalt-Dialog)
 function get_world_experiment_toggles(string $worldName): array {
     $levelDat = MC_WORLDS_DIR . '/' . $worldName . '/level.dat';
@@ -1280,7 +1356,7 @@ function set_world_experiment(string $worldName, string $key, bool $enable): arr
         return ['success' => false, 'message' => 'level.dat ungültig'];
     }
 
-    $nbt = nbt_set_root_byte_flag(substr($raw, 8), $key, $enable);
+    $nbt = nbt_set_experiment_flag(substr($raw, 8), $key, $enable);
     if ($enable) {
         $nbt = nbt_set_root_byte_flag($nbt, 'experiments_ever_used', true);
         $nbt = nbt_set_root_byte_flag($nbt, 'saved_with_toggled_experiments', true);
