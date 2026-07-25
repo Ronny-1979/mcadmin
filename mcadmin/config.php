@@ -47,6 +47,14 @@ define('MAX_BACKUP_COUNT', 20);
 define('DEFAULT_ADMIN_USER', 'admin');
 define('DEFAULT_ADMIN_PASS', 'admin');
 
+// ── Login-Session ─────────────────────────────────────────────
+// Cookie und serverseitige Session laufen 1 Jahr statt bis Browser-Ende, damit man
+// dauerhaft angemeldet bleibt. Muss VOR jedem session_start() gesetzt sein (index.php,
+// api/handler.php) — wirkt dann automatisch bei jedem neuen/erneuerten Session-Cookie.
+define('MC_SESSION_LIFETIME', 60 * 60 * 24 * 365);
+ini_set('session.cookie_lifetime', MC_SESSION_LIFETIME);
+ini_set('session.gc_maxlifetime', MC_SESSION_LIFETIME);
+
 // ── Verzeichnisse anlegen ─────────────────────────────────────
 foreach ([MC_BACKUP_DIR, MC_UPLOAD_DIR] as $dir) {
     if (!is_dir($dir)) mkdir($dir, 0755, true);
