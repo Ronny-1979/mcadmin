@@ -2817,17 +2817,63 @@ function get_latest_bedrock_version(): array {
     return ['version' => 'unbekannt', 'download_url' => null, 'timestamp' => time()];
 }
 
-// Startet ein Server-Update im Hintergrund (Backup → Stop → Download → Install → Start)
-function run_update_async(string $version): array {
+// Ruft eine community-gepflegte Liste vergangener Bedrock-Server-Versionen ab (Mojang selbst
+// liefert über seine API/Downloadseite nur die aktuell neueste Version, siehe oben). Gecacht wie
+// get_latest_bedrock_version(), aber mit deutlich längerer TTL, da sich die Liste nur bei neuen
+// Releases ändert. Liefert bei jedem Fehler eine leere Liste, statt eine Exception zu werfen —
+// die Liste ist ein Zusatzangebot für die Downgrade-Auswahl, kein Ersatz für den bestehenden
+// "auf neueste Version aktualisieren"-Weg, der davon unberührt bleiben muss.
+function get_recent_bedrock_versions(bool $force = false): array {
+    if (!$force && file_exists(MC_VERSIONS_LIST_CACHE)) {
+        $cache = json_decode(file_get_contents(MC_VERSIONS_LIST_CACHE), true);
+        if (is_array($cache) && !empty($cache['versions']) && (time() - ($cache['timestamp'] ?? 0)) < MC_VERSIONS_LIST_CACHE_TTL) {
+            return $cache['versions'];
+        }
+    }
+
+    $src  = 'https://raw.githubusercontent.com/kittizz/bedrock-server-downloads/main/bedrock-server-downloads.json';
+    $json = shell_exec('curl -sL --max-time 15 -A ' . escapeshellarg('Mozilla/5.0') . ' ' . escapeshellarg($src) . ' 2>/dev/null') ?: '';
+    $data = $json ? json_decode($json, true) : null;
+
+    $versions = [];
+    foreach (($data['release'] ?? []) as $entry) {
+        $linkUrl = $entry['linux']['url'] ?? '';
+        // Die echte 4-teilige Versionsnummer steckt im Dateinamen der URL, nicht immer im
+        // JSON-Key (z.B. Key "1.21.100" → Datei "bedrock-server-1.21.100.7.zip") — dieselbe
+        // Extraktion wie oben, damit das Format garantiert zur start_update-Validierung passt.
+        if ($linkUrl && preg_match('/bedrock-server-([0-9.]+)\.zip/', $linkUrl, $m)) {
+            $versions[$m[1]] = $linkUrl; // Key = Version, dedupliziert automatisch
+        }
+    }
+    // Nach Versionsnummer absteigend sortieren (numerisch pro Segment, nicht alphabetisch)
+    uksort($versions, fn($a, $b) => version_compare($b, $a));
+    $versions = array_slice($versions, 0, 15, true);
+
+    $result = [];
+    foreach ($versions as $ver => $dlUrl) $result[] = ['version' => $ver, 'url' => $dlUrl];
+
+    if ($result) {
+        file_put_contents(MC_VERSIONS_LIST_CACHE, json_encode(['versions' => $result, 'timestamp' => time()]));
+    }
+    return $result;
+}
+
+// Startet ein Server-Update im Hintergrund (Backup → Stop → Download → Install → Start).
+// $downloadUrl kann eine bereits bekannte/verifizierte Download-URL sein (z.B. aus der
+// Versions-Auswahl für ein Downgrade) — wird sie nicht übergeben, greift wie bisher die
+// "neueste Version"-Erkennung mit dem geratenen URL-Muster als Fallback.
+function run_update_async(string $version, ?string $downloadUrl = null): array {
     $statusFile = sys_get_temp_dir() . '/mc_update_status.json';
     $script     = '/tmp/mc_update.sh';
     $mcDir      = MC_SERVER_DIR;
     $svcName    = MC_SERVICE_NAME;
     $backupDir  = MC_BACKUP_DIR;
-    $latest     = get_latest_bedrock_version();
-    $downloadUrl = $latest['download_url'] ?? '';
-    if (($latest['version'] ?? '') !== $version || !$downloadUrl) {
-        $downloadUrl = "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-{$version}.zip";
+    if (!$downloadUrl) {
+        $latest      = get_latest_bedrock_version();
+        $downloadUrl = $latest['download_url'] ?? '';
+        if (($latest['version'] ?? '') !== $version || !$downloadUrl) {
+            $downloadUrl = "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-{$version}.zip";
+        }
     }
 
     $sh = <<<BASH

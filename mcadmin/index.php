@@ -446,7 +446,18 @@ try {
                 <div class="stat"><div class="sl">Verfügbar</div><div id="v-lat" style="font-size:14px;font-weight:700;margin-top:3px">...</div></div>
               </div>
               <div class="lbox mb12" id="upd-log"><span class="dim">Kein aktiver Prozess.</span></div>
-              <button class="btn warn" onclick="startUpdate()" id="btn-upd" disabled>⬆ Update installieren</button>
+              <div class="fx g8 mb12">
+                <button class="btn warn" onclick="startUpdate()" id="btn-upd" disabled>⬆ Update installieren</button>
+                <button class="btn ghost sm" onclick="toggleVersionPicker()">🕐 Andere Version</button>
+              </div>
+              <div id="v-picker" class="hidden">
+                <div class="dim xs2" style="margin:0 0 8px">⚠️ Downgrade auf eine ältere Version kann bei Welten mit neueren Inhalten (Blöcke/Items) Probleme verursachen. Es wird automatisch ein Backup vor der Installation erstellt — im Zweifel im Backups-Tab wiederherstellen.</div>
+                <select id="v-pick-list" class="pinp mb8" onchange="document.getElementById('v-pick-custom').value=''"><option value="">Lade Versionen...</option></select>
+                <div class="fx g8">
+                  <input type="text" id="v-pick-custom" class="pinp" placeholder="oder eigene Version, z.B. 1.20.10.01" style="flex:1">
+                  <button class="btn warn sm" onclick="startVersionPick()">Installieren</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="card" style="margin:0">
@@ -649,7 +660,7 @@ try {
 </div><!-- /layout -->
 <div id="tc"></div>
 
-<script src="assets/app.js?v=23" defer></script>
+<script src="assets/app.js?v=24" defer></script>
 <?php endif; ?>
 </body>
 </html>

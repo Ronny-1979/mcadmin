@@ -62,10 +62,18 @@ try {
             ]); break;
         case 'server_installed':  // Prüft ob der Bedrock-Server installiert ist
             echo json_encode(['installed'=>server_is_installed(),'version'=>get_server_version()]); break;
-        case 'start_update':      // Startet den asynchronen Server-Update-Prozess
+        case 'get_mc_versions':   // Liste der letzten Bedrock-Release-Versionen für die Downgrade-Auswahl
+            echo json_encode(['versions' => get_recent_bedrock_versions(!empty($_POST['force']) || !empty($_GET['force']))]); break;
+        case 'start_update':      // Startet den asynchronen Server-Update-Prozess (auch für Downgrades)
             $ver = $_POST['version'] ?? '';
             if (!preg_match('/^\d{1,5}\.\d{1,5}\.\d{1,5}\.\d{1,5}$/', $ver)) { echo json_encode(['success'=>false,'message'=>'Ungültige Version']); break; }
-            echo json_encode(run_update_async($ver)); break;
+            // Optionale, bereits bekannte Download-URL (z.B. aus der Versionsliste) — landet später
+            // in einem Bash-Heredoc, deshalb streng gegen das erwartete Mojang-URL-Muster geprüft.
+            $url = trim($_POST['url'] ?? '');
+            if ($url !== '' && !preg_match('#^https://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-[0-9.]+\.zip$#', $url)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültige Download-URL']); break;
+            }
+            echo json_encode(run_update_async($ver, $url ?: null)); break;
         case 'update_status':     // Gibt den aktuellen Fortschritt des Server-Updates zurück
             echo json_encode(get_update_status()); break;
         case 'check_panel_update':  // Vergleicht installierten Panel-Hash mit GitHub-Stand

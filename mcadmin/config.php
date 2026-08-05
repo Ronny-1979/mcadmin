@@ -32,6 +32,7 @@ define('MC_BACKUP_DIR',      __DIR__ . '/backups');
 define('MC_UPLOAD_DIR',      __DIR__ . '/uploads');
 define('MC_STATE_FILE',      __DIR__ . '/mcadmin_state.json');
 define('MC_VERSION_CACHE_FILE', __DIR__ . '/version_cache.json');
+define('MC_VERSIONS_LIST_CACHE', __DIR__ . '/versions_list_cache.json');
 define('MC_SETTINGS_FILE',   __DIR__ . '/mcadmin_settings.json');
 define('MC_PANEL_VERSION_FILE',  __DIR__ . '/.mcadmin_version');
 define('MC_PANEL_UPDATE_SCRIPT', '/usr/local/sbin/mcadmin-panel-update.sh');
@@ -39,6 +40,7 @@ define('MC_PANEL_UPDATE_CACHE',  __DIR__ . '/panel_version_cache.json');
 
 // ── Versions-Cache ────────────────────────────────────────────
 define('MC_VERSION_CACHE_TTL', 900);
+define('MC_VERSIONS_LIST_CACHE_TTL', 21600); // 6h — Liste vergangener Versionen ändert sich nur bei neuen Releases
 
 // ── Backup-Limit ──────────────────────────────────────────────
 define('MAX_BACKUP_COUNT', 20);

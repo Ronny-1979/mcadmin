@@ -2,6 +2,7 @@
 mcadmin/mcadmin_state.json
 mcadmin/mcadmin_settings.json
 mcadmin/version_cache.json
+mcadmin/versions_list_cache.json
 mcadmin/panel_version_cache.json
 mcadmin/.mcadmin_version
 mcadmin/backups/

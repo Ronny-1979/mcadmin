@@ -362,6 +362,54 @@ async function startUpdate(){
   toast('Update läuft...','info',4000);
 }
 
+// Vergleicht zwei Versionsstrings ("1.20.10.1" vs "1.21.0.3") segmentweise numerisch.
+// a<b: -1, a=b: 0, a>b: 1 — für die Downgrade-Erkennung in der Versionsliste/Bestätigung.
+function verCompare(a,b){
+  const pa=a.split('.').map(Number),pb=b.split('.').map(Number);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){const x=pa[i]||0,y=pb[i]||0;if(x!==y)return x<y?-1:1;}
+  return 0;
+}
+let vPickerLoaded=false;
+// Blendet die Versionsauswahl ein/aus und lädt die Liste beim ersten Öffnen nach
+async function toggleVersionPicker(){
+  const el=document.getElementById('v-picker');if(!el)return;
+  el.classList.toggle('hidden');
+  if(!el.classList.contains('hidden')&&!vPickerLoaded){vPickerLoaded=true;await loadMcVersions();}
+}
+// Lädt die letzten Bedrock-Release-Versionen und markiert sie relativ zur installierten Version
+async function loadMcVersions(){
+  const sel=document.getElementById('v-pick-list');if(!sel)return;
+  try{
+    const r=await api('get_mc_versions');
+    const cur=G.ver?.current;
+    if(!r.versions||!r.versions.length){sel.innerHTML='<option value="">Keine Liste verfügbar — eigene Version unten eingeben</option>';return;}
+    sel.innerHTML='<option value="">— Version wählen —</option>'+r.versions.map(v=>{
+      const tag=(cur&&cur!=='unbekannt')?(verCompare(v.version,cur)<0?' ⬇ Downgrade':(verCompare(v.version,cur)>0?' ⬆':' (aktuell)')):'';
+      return `<option value="${e(v.version)}" data-url="${e(v.url)}">${e(v.version)}${tag}</option>`;
+    }).join('');
+  }catch(err){sel.innerHTML='<option value="">Fehler beim Laden — eigene Version unten eingeben</option>';}
+}
+// Installiert die in der Liste gewählte oder manuell eingegebene Version (inkl. Downgrades) —
+// nutzt denselben start_update-Endpunkt und dieselbe Fortschrittsanzeige wie startUpdate()
+async function startVersionPick(){
+  const custom=document.getElementById('v-pick-custom').value.trim();
+  const sel=document.getElementById('v-pick-list');
+  const opt=sel.options[sel.selectedIndex];
+  const ver=custom||sel.value;
+  if(!ver||!/^\d{1,5}\.\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(ver)){toast('Bitte gültige Version wählen oder eingeben (z.B. 1.20.10.01)','error');return;}
+  const url=custom?'':(opt?.dataset.url||'');
+  const cur=G.ver?.current;
+  const isDowngrade=cur&&cur!=='unbekannt'&&verCompare(ver,cur)<0;
+  const warn=isDowngrade?`\n\n⚠️ Das ist ein DOWNGRADE von ${cur} auf ${ver}. Welten mit neueren Inhalten können Probleme machen. Ein Backup wird automatisch erstellt.`:'';
+  if(!confirm(`${ver} installieren?${warn}\n1. Server stoppen\n2. Backup erstellen\n3. Download\n4. Version installieren\n5. Welten/Packs/Einstellungen wiederherstellen\n6. Server starten`))return;
+  document.getElementById('btn-upd').disabled=true;const _ul=document.getElementById('upd-log');if(_ul)_ul.innerHTML='';
+  addUpdLog('init','running','Starte...');
+  const r=await api('start_update',{version:ver,url});
+  if(!r.success){toast(r.message||'Fehler','error');document.getElementById('btn-upd').disabled=false;return;}
+  if(updTimer)clearInterval(updTimer);updTimer=setInterval(pollUpd,2000);
+  toast('Installation läuft...','info',4000);
+}
+
 // ═══ BACKUPS ══════════════════════════════════════════════
 // Lädt und rendert die Backup-Liste mit Export-, Restore- und Lösch-Buttons
 async function loadBk(){
