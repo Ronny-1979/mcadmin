@@ -46,6 +46,7 @@ try {
                 'players'            => get_online_players(),
                 'uptime'             => get_server_uptime(),
                 'experiment_issues'  => detect_missing_experiments(),
+                'engine_version_issues' => detect_engine_version_issues(),
             ]); break;
         case 'server_start':   echo json_encode(server_start());   break;  // Startet den Minecraft-Server
         case 'server_stop':    echo json_encode(server_stop());    break;  // Stoppt den Minecraft-Server

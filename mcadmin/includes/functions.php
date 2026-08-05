@@ -180,6 +180,19 @@ function get_server_version(): string {
     return $m[1] ?? 'unbekannt';
 }
 
+// Vergleicht ein Pack-min_engine_version-Array (3-teilig) gegen die installierte BDS-Version.
+// true = Pack verlangt eine höhere Engine-Version als aktuell installiert ist.
+function pack_requires_higher_engine(array $minVer, array $bdParts): bool {
+    $minParts = array_map('intval', array_slice($minVer, 0, 3));
+    foreach ([0, 1, 2] as $i) {
+        $bd  = $bdParts[$i]  ?? 0;
+        $min = $minParts[$i] ?? 0;
+        if ($min > $bd) return true;
+        if ($bd > $min) return false;
+    }
+    return false;
+}
+
 // Prüft eingebettete Pack-Manifeste und Experiment-Flags der Welt auf BDS-Versions-Kompatibilität
 function check_world_compat_issues(string $worldRoot, string $bdVersion): array {
     $bdParts      = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
@@ -196,20 +209,13 @@ function check_world_compat_issues(string $worldRoot, string $bdVersion): array 
                 $data   = json_decode((string)file_get_contents($manifest), true);
                 $minVer = $data['header']['min_engine_version'] ?? null;
                 if (!is_array($minVer) || count($minVer) < 2) continue;
-                $minParts = array_map('intval', array_slice($minVer, 0, 3));
-                foreach ([0, 1, 2] as $i) {
-                    $bd  = $bdParts[$i]  ?? 0;
-                    $min = $minParts[$i] ?? 0;
-                    if ($min > $bd) {
-                        $issues[] = [
-                            'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
-                            'pack'      => $data['header']['name'] ?? $pack,
-                            'requires'  => implode('.', $minParts),
-                            'installed' => implode('.', $bdParts),
-                        ];
-                        break;
-                    }
-                    if ($bd > $min) break;
+                if (pack_requires_higher_engine($minVer, $bdParts)) {
+                    $issues[] = [
+                        'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
+                        'pack'      => $data['header']['name'] ?? $pack,
+                        'requires'  => implode('.', array_pad(array_slice($minVer, 0, 3), 3, 0)),
+                        'installed' => implode('.', $bdParts),
+                    ];
                 }
             }
         }
@@ -217,6 +223,66 @@ function check_world_compat_issues(string $worldRoot, string $bdVersion): array 
 
     $experiments = get_world_experiments($worldRoot);
     return ['issues' => $issues, 'experiments' => $experiments];
+}
+
+// Prüft ob für die aktive Welt ein Bedrock-Systempack (vanilla/chemistry/editor/...) oder ein
+// aktiviertes Zusatz-Pack eine höhere BDS-Engine-Version verlangt als aktuell installiert ist.
+// Scannt bewusst direkt die serverweiten Pack-Ordner (nicht get_installed_packs()/
+// find_installed_pack() — die blenden Bedrock-Systempacks per Design aus, siehe
+// is_builtin_bedrock_pack(), sind für diesen Check also blind) und behandelt Systempacks als
+// IMMER aktiv (jede Welt lädt sie implizit), Zusatz-Packs dagegen nur wenn für die aktive Welt
+// aktiviert. Typischer Auslöser: nach einem Downgrade sind alte, per Update-Merge nie wirklich
+// ersetzte Systempack-Manifeste (siehe run_update_async()) neuer als der installierte Server.
+function detect_engine_version_issues(): array {
+    $activeWorld = get_active_world();
+    if (!$activeWorld) return [];
+
+    $bdVersion = get_server_version();
+    $bdParts   = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
+    if ($bdParts[0] <= 0) return []; // Version unbekannt/nicht installiert -> kein Check möglich
+
+    // UUIDs der für die aktive Welt aktivierten Zusatz-Packs (Systempacks sind immer relevant,
+    // unabhängig von world_packs, siehe Kommentar oben)
+    $wp = get_world_packs($activeWorld);
+    $enabledUuids = ['behavior' => [], 'resource' => []];
+    foreach (['behavior', 'resource'] as $pt) {
+        foreach ($wp[$pt] ?? [] as $ref) {
+            if (!empty($ref['enabled'])) $enabledUuids[$pt][strtolower($ref['uuid'])] = true;
+        }
+    }
+
+    $dirs   = ['behavior' => MC_PACKS_BEHAVIOR_DIR, 'resource' => MC_PACKS_RESOURCE_DIR];
+    $labels = ['behavior' => 'Behavior', 'resource' => 'Resource'];
+    $issues = [];
+
+    foreach ($dirs as $type => $dir) {
+        if (!is_dir($dir)) continue;
+        foreach (array_diff((array)@scandir($dir), ['.', '..']) as $folder) {
+            $manifest = $dir . '/' . $folder . '/manifest.json';
+            if (!file_exists($manifest)) continue;
+            $data   = json_decode((string)file_get_contents($manifest), true) ?: [];
+            $header = $data['header'] ?? [];
+            $minVer = $header['min_engine_version'] ?? null;
+            if (!is_array($minVer) || count($minVer) < 2) continue;
+
+            $isBuiltin = is_builtin_bedrock_pack($folder, $data);
+            $uuid      = strtolower($header['uuid'] ?? '');
+            if (!$isBuiltin && !($enabledUuids[$type][$uuid] ?? false)) continue;
+
+            if (pack_requires_higher_engine($minVer, $bdParts)) {
+                $issues[] = [
+                    'type'      => $labels[$type],
+                    'pack'      => resolve_pack_name($dir . '/' . $folder, $header['name'] ?? $folder),
+                    'requires'  => implode('.', array_pad(array_slice($minVer, 0, 3), 3, 0)),
+                    'installed' => implode('.', $bdParts),
+                    'world'     => $activeWorld,
+                    'builtin'   => $isBuiltin,
+                ];
+            }
+        }
+    }
+
+    return $issues;
 }
 
 // ============================================================
@@ -2898,6 +2964,15 @@ cleanup_tmp() { rm -rf "\$TMPDIR" "\$TMP" "\$PRESERVE"; }
 PROTECTED_FILES=(server.properties whitelist.json allowlist.json permissions.json valid_known_packs.json)
 PROTECTED_DIRS=(worlds behavior_packs resource_packs)
 
+BUILTIN_PACK_NAMES=(chemistry chemistry_behavior_pack chemistry_resource_pack editor editor_behavior_pack editor_resources editor_resource_pack education education_behavior_pack education_resource_pack experimental experimental_behavior_pack experimental_resource_pack persona vanilla vanilla_behavior_pack vanilla_resource_pack vanilla_music vanilla_nether vanilla_raytracing vanilla_texture vanilla_texture_pack vanilla_world)
+BUILTIN_PACK_PREFIXES=(vanilla_ chemistry_ editor_ education_ experimental_ persona_)
+is_builtin_pack_folder() {
+    local n="\$1"
+    for p in "\${BUILTIN_PACK_NAMES[@]}"; do [ "\$n" = "\$p" ] && return 0; done
+    for pre in "\${BUILTIN_PACK_PREFIXES[@]}"; do case "\$n" in "\$pre"*) return 0;; esac; done
+    return 1
+}
+
 copy_if_exists() {
     src="\$1"
     dst="\$2"
@@ -2925,12 +3000,22 @@ restore_protected_data() {
         echo "Wiederhergestellt: worlds"
     fi
 
-    # Packs vorsichtig zurueck mergen: vorhandene/importierte Packs bleiben erhalten.
-    # Neue Mojang-Dateien aus dem Update werden dabei nicht komplett geloescht.
+    # Packs vorsichtig zurueck mergen: vorhandene/importierte Zusatz-Packs bleiben erhalten.
+    # Bedrock-Systempacks (vanilla/chemistry/editor/...) werden NICHT zurueckgemergt, damit sie
+    # immer zur frisch installierten Server-Version passen -- sonst bleibt ihr Manifest (und damit
+    # min_engine_version) dauerhaft auf dem Stand von vor diesem Update eingefroren.
     for dir in behavior_packs resource_packs; do
         if [ -d "\$PRESERVE/\$dir" ]; then
             mkdir -p "\$MC_DIR/\$dir" || return 1
-            cp -a "\$PRESERVE/\$dir/." "\$MC_DIR/\$dir/" || return 1
+            for sub in "\$PRESERVE/\$dir"/*; do
+                [ -e "\$sub" ] || continue
+                subname="\$(basename "\$sub")"
+                if is_builtin_pack_folder "\$subname"; then
+                    echo "Uebersprungen (Bedrock-Systempack, bleibt auf Zielversion): \$dir/\$subname"
+                    continue
+                fi
+                cp -a "\$sub" "\$MC_DIR/\$dir/" || return 1
+            done
             echo "Zusammengefuehrt: \$dir"
         fi
     done

@@ -7,6 +7,7 @@ const G={
   conPaused:false,conTimer:null,conActive:false,conHist:[],conHistIdx:-1,conLines:100,
   srvWasRunning:false,
   dismissedExp:new Set(),
+  dismissedEngine:new Set(),
 };
 
 // ═══ API ══════════════════════════════════════════════════
@@ -105,6 +106,7 @@ async function refreshStatus(){
     if(s.running&&!G.srvWasRunning&&G.tab==='worlds')loadWorlds();
     G.srvWasRunning=s.running;
     renderExpBanner(s.experiment_issues||[]);
+    renderEngineBanner(s.engine_version_issues||[]);
   }catch(e){}
 }
 
@@ -163,6 +165,67 @@ async function activateExpIssue(world,key,label,btn){
     if(btn)btn.disabled=false;
   }finally{
     setTimeout(refreshStatus,1500);
+  }
+}
+
+// ═══ ENGINE-VERSIONS-HINWEISE ═══════════════════════════════
+// Zeigt einen Hinweis-Banner, wenn ein Systempack (vanilla/chemistry/...) oder ein für die aktive
+// Welt aktiviertes Zusatz-Pack eine höhere BDS-Engine-Version verlangt als installiert ist — meist
+// nach einem Downgrade. Alle Probleme haben dieselbe Lösung (Update auf neueste Version), daher
+// EIN Banner statt pro Pack.
+function renderEngineBanner(issues){
+  const el=document.getElementById('engine-banner');
+  if(!el)return;
+  if(!issues.length){el.classList.add('hidden');el.innerHTML='';return;}
+  const world=issues[0].world;
+  let maxReq=issues[0].requires;
+  for(const x of issues)if(verCompare(x.requires,maxReq)>0)maxReq=x.requires;
+  const dismissKey=world+'|'+maxReq;
+  if(G.dismissedEngine.has(dismissKey)){el.classList.add('hidden');el.innerHTML='';return;}
+  const packs=[...new Set(issues.map(x=>x.pack))].join('“, „');
+  el.classList.remove('hidden');
+  el.innerHTML=`
+    <div class="ub warn2" style="margin-bottom:8px">
+      <div>⛔</div>
+      <div style="flex:1;min-width:0">
+        <strong style="color:var(--red)">Server-Version zu alt für installierte Packs:</strong>
+        In Welt „${e(world)}" braucht Pack „${packs}" mind. Engine-Version <strong>${e(maxReq)}</strong>,
+        installiert ist aber nur <strong>${e(issues[0].installed)}</strong>. Das passiert typischerweise nach einem
+        Downgrade, während Pack-Dateien (auch Mojangs eigene Standard-Packs) auf dem neueren Stand bleiben.
+        <strong>Kein Grund für eine Neuinstallation oder eine gelöschte Welt</strong> — beides würde daran nichts
+        ändern. Ein Update auf die neueste Version behebt es (automatisches Backup vorher, Welten/Packs/
+        Einstellungen bleiben erhalten).
+      </div>
+      <div class="fx g6" style="flex-shrink:0">
+        <button class="btn warn sm" onclick="fixEngineVersionIssue(this)">Auf neueste Version aktualisieren</button>
+        <button class="btn ghost sm" onclick="dismissEngineIssue('${e(dismissKey)}')">Später</button>
+      </div>
+    </div>`;
+}
+// Blendet einen Engine-Versions-Hinweis für die laufende Sitzung aus (kein Server-State, nur UI)
+function dismissEngineIssue(key){
+  G.dismissedEngine.add(key);
+  refreshStatus();
+}
+// Aktualisiert den Server auf die neueste Version, um Engine-Versions-Konflikte zu beheben —
+// nutzt denselben start_update-Endpunkt/dieselbe Fortschrittsanzeige wie startUpdate().
+async function fixEngineVersionIssue(btn){
+  if(btn)btn.disabled=true;
+  try{
+    if(!G.ver||!G.ver.latest||G.ver.latest==='unbekannt')await checkVer();
+    const ver=G.ver?.latest;
+    if(!ver||ver==='unbekannt'){toast('Neueste Version konnte nicht ermittelt werden','error');if(btn)btn.disabled=false;return;}
+    if(!confirm(`Server auf ${ver} aktualisieren?\n1. Server stoppen\n2. Backup erstellen\n3. Download\n4. Neue Version installieren\n5. Welten/Packs/Einstellungen wiederherstellen\n6. Server starten`)){if(btn)btn.disabled=false;return;}
+    const updBtn=document.getElementById('btn-upd');if(updBtn)updBtn.disabled=true;
+    const _ul=document.getElementById('upd-log');if(_ul)_ul.innerHTML='';
+    addUpdLog('init','running','Starte...');
+    const r=await api('start_update',{version:ver});
+    if(!r.success){toast(r.message||'Fehler','error');if(updBtn)updBtn.disabled=false;if(btn)btn.disabled=false;return;}
+    if(updTimer)clearInterval(updTimer);updTimer=setInterval(pollUpd,2000);
+    toast('Update läuft — Fortschritt siehe Einstellungen → Updates','info',5000);
+  }catch(err){
+    toast('Fehler: '+err.message,'error');
+    if(btn)btn.disabled=false;
   }
 }
 
