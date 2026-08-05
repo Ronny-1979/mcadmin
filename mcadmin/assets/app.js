@@ -911,6 +911,7 @@ const SCHEMA=[
   {k:'content-log-console-output-enabled',l:'Content-Log in Konsole',t:'bool'},
   {k:'broadcast-console-to-ops',l:'Konsole an OPs senden',t:'bool'},
   {S:'Script-Watchdog'},
+  {k:'allow-outbound-script-debugging',l:'Ausgehendes Script-Debugging',t:'bool',d:'Erlaubt /script debugger connect zu einem externen Debugger (z.B. VS Code). Standard: aus'},
   {k:'script-watchdog-enable',l:'Watchdog aktiv',t:'bool',d:'Überwacht Scripting API Add-Ons'},
   {k:'script-watchdog-hang-threshold',l:'Hang-Schwelle (ms)',t:'num',min:0,d:'Standard: 3000'},
   {k:'script-watchdog-spike-threshold',l:'Spike-Schwelle (ms)',t:'num',min:0,d:'Standard: 100'},
