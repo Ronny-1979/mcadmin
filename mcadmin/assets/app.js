@@ -898,7 +898,6 @@ const SCHEMA=[
   {S:'Netzwerk & Verschlüsselung'},
   {k:'transport',l:'Transport-Protokoll',t:'sel',o:['nethernet'],d:'Ab BDS 1.26.5x ist nur noch nethernet unterstützt (TCP server-port + UDP-Bereich). Das Panel setzt den Wert vor jedem Start automatisch.'},
   {k:'server-udp-ports',l:'NetherNet UDP-Ports',t:'text',d:'Nur bei transport=nethernet. Bereich z.B. 19140-19155 (muss in der Firewall offen sein) oder hinter NAT: <öffentliche-IP>:19140-19155:19140-19155'},
-  {k:'server-ip',l:'Server-IP',t:'text',d:'Optional (NetherNet): IP-Adresse des Servers. Leer = automatisch'},
   {k:'compression-threshold',l:'Kompressions-Schwelle',t:'num',min:0},
   {k:'log-ips',l:'IP-Adressen loggen',t:'bool',d:'Client-IPs in Server-Logs erfassen'},
   {S:'Bewegungs-Authorität'},
@@ -938,7 +937,7 @@ async function editProps(worldName){
   document.getElementById('btn-save-props').disabled=false;
   document.getElementById('props-body').innerHTML='<div class="dim xs2" style="text-align:center;padding:20px">Lade...</div>';
   const r=await api('get_properties',{world:worldName});
-  G.propsData={...r.properties};renderPropsEditor(r.properties);
+  G.propsData={...r.properties};G.propsOrig={...r.properties};renderPropsEditor(r.properties);
 }
 // Rendert den Properties-Editor mit Sektionen und unbekannten Keys als Textfelder
 function renderPropsEditor(props){
@@ -962,11 +961,17 @@ function renderPI(def,val){
   return`<input ${a} type="text" value="${e(val)}">`;
 }
 // Aktualisiert den Properties-Puffer bei Änderung eines Eingabefelds
-function propsChg(el){G.propsData[el.dataset.key]=el.value;}
+function propsChg(el){el.dataset.dirty='1';G.propsData[el.dataset.key]=el.value;}
 // Speichert alle Properties-Änderungen für die aktive Welt
 async function saveProps(){
   if(!G.propsWorld){toast('Keine Welt gewählt','error');return;}
-  document.querySelectorAll('.pinp').forEach(el=>{if(el.dataset.key)G.propsData[el.dataset.key]=el.value;});
+  // Nur Felder übernehmen, die schon in der Datei stehen oder geändert wurden. Unberührte Felder
+  // ohne Wert (z.B. leeres server-ip) nicht anlegen — sonst bindet BDS u.U. an keine Adresse mehr.
+  const orig=G.propsOrig||{};
+  document.querySelectorAll('.pinp').forEach(el=>{
+    const k=el.dataset.key;if(!k)return;
+    if(Object.prototype.hasOwnProperty.call(orig,k)||el.dataset.dirty==='1')G.propsData[k]=el.value;
+  });
   const r=await api('save_properties',{world:G.propsWorld,properties:JSON.stringify(G.propsData)});
   toast(r.message||(r.success?'Gespeichert':'Fehler'),r.success?'success':'error');
   if(r.success)loadWorlds();

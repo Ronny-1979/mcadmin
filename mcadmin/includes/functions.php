@@ -624,6 +624,14 @@ function ensure_nethernet_properties(?string $file = null): void {
     if (strtolower(trim((string)($props['transport'] ?? ''))) !== 'nethernet') $values['transport'] = 'nethernet';
     if (trim((string)($props['server-udp-ports'] ?? '')) === '') $values['server-udp-ports'] = '19140-19155';
     if ($values) set_properties($values, $file);
+
+    // Ein leeres "server-ip=" lässt BDS 1.26.5x nicht mehr auf server-port lauschen (kein
+    // "Accepting clients on ..." im Log, niemand kann beitreten) -> leere Zeile entfernen.
+    if (array_key_exists('server-ip', $props) && trim((string)$props['server-ip']) === '') {
+        $entries = array_values(array_filter(parse_properties($file),
+            fn($e) => !($e['type'] === 'property' && $e['key'] === 'server-ip')));
+        file_put_contents($file, serialize_properties($entries));
+    }
 }
 
 // Wendet ensure_nethernet_properties() auf die aktive server.properties und die welt-eigene Kopie an
