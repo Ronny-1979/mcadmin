@@ -891,7 +891,7 @@ const SCHEMA=[
   {k:'max-threads',l:'Max. Threads',t:'num',min:0,d:'0 = automatisch'},
   {k:'entity-broadcast-range-percentage',l:'Entitäten-Sichtbereich (%)',t:'num',min:1,max:100,d:'100 = maximale Reichweite'},
   {S:'Netzwerk & Verschlüsselung'},
-  {k:'transport',l:'Transport-Protokoll',t:'sel',o:['nethernet','raknet'],d:'Ab BDS 26.50 Standard: nethernet (WebRTC, TCP server-port + UDP-Bereich). raknet = altes Verfahren, nur UDP server-port — als Fallback bei Verbindungsproblemen (z.B. iOS-Clients)'},
+  {k:'transport',l:'Transport-Protokoll',t:'sel',o:['nethernet'],d:'Ab BDS 1.26.5x ist nur noch nethernet unterstützt (TCP server-port + UDP-Bereich). Das Panel setzt den Wert vor jedem Start automatisch.'},
   {k:'server-udp-ports',l:'NetherNet UDP-Ports',t:'text',d:'Nur bei transport=nethernet. Bereich z.B. 19140-19155 (muss in der Firewall offen sein) oder hinter NAT: <öffentliche-IP>:19140-19155:19140-19155'},
   {k:'server-ip',l:'Server-IP',t:'text',d:'Optional (NetherNet): IP-Adresse des Servers. Leer = automatisch'},
   {k:'compression-threshold',l:'Kompressions-Schwelle',t:'num',min:0},

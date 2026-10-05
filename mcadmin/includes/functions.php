@@ -39,6 +39,7 @@ function server_start(): array {
     // Packs und Experimente (z.B. holiday_creator_features) vor dem Start sicherstellen
     $activeWorld = get_active_world();
     if ($activeWorld) apply_world_packs($activeWorld);
+    ensure_nethernet_for_active_world();
 
     exec('sudo systemctl start ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
     if ($code === 0) {
@@ -72,6 +73,7 @@ function server_restart(): array {
     // Packs und Experimente (z.B. holiday_creator_features) vor dem Neustart sicherstellen
     $activeWorld = get_active_world();
     if ($activeWorld) apply_world_packs($activeWorld);
+    ensure_nethernet_for_active_world();
 
     exec('sudo systemctl stop ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
     if ($code !== 0) {
@@ -608,6 +610,29 @@ function set_server_property(string $key, string $value, ?string $file = null): 
     return set_properties([$key => $value], $file);
 }
 
+// Ab BDS 1.26.5x ist NetherNet der einzige unterstützte Transport. Fehlt "transport=nethernet",
+// meldet der Server "TRANSPORT TYPE ERROR" und niemand kann beitreten. Welt-eigene
+// .server.properties stammen oft aus älteren Versionen und überschreiben beim Weltwechsel/Update
+// die neue Datei von Mojang — deshalb vor jedem Start sicherstellen. Ältere BDS-Versionen
+// ignorieren unbekannte Keys, ein Downgrade ist dadurch also unproblematisch.
+// server-udp-ports wird nur gesetzt, wenn es fehlt (passend zu den Firewall-Regeln aus install.sh).
+function ensure_nethernet_properties(?string $file = null): void {
+    $file ??= MC_PROPERTIES_FILE;
+    if (!file_exists($file)) return;
+    $props  = get_all_properties($file);
+    $values = [];
+    if (strtolower(trim((string)($props['transport'] ?? ''))) !== 'nethernet') $values['transport'] = 'nethernet';
+    if (trim((string)($props['server-udp-ports'] ?? '')) === '') $values['server-udp-ports'] = '19140-19155';
+    if ($values) set_properties($values, $file);
+}
+
+// Wendet ensure_nethernet_properties() auf die aktive server.properties und die welt-eigene Kopie an
+function ensure_nethernet_for_active_world(): void {
+    ensure_nethernet_properties(MC_PROPERTIES_FILE);
+    $active = get_active_world();
+    if ($active && file_exists(world_properties_file($active))) ensure_nethernet_properties(world_properties_file($active));
+}
+
 // Gibt den Pfad zur welt-eigenen .server.properties-Datei zurück
 function world_properties_file(string $worldName): string {
     return MC_WORLDS_DIR . '/' . $worldName . '/.server.properties';
@@ -625,6 +650,7 @@ function load_world_properties(string $worldName): bool {
     if (file_exists($src)) {
         if (!copy($src, MC_PROPERTIES_FILE)) return false;
         set_server_property('level-name', $worldName);
+        ensure_nethernet_properties(MC_PROPERTIES_FILE);
         return true;
     }
     return set_server_property('level-name', $worldName);
@@ -3146,6 +3172,17 @@ write "restore" "done" "Gesicherte Daten wiederhergestellt"
 cleanup_tmp
 
 write "start" "running" "Server wird gestartet..."
+# Ab BDS 1.26.5x funktioniert nur noch NetherNet. Die wiederhergestellte server.properties
+# stammt evtl. aus einer älteren Version ohne "transport" -> auf nethernet setzen.
+PROPS="\$MC_DIR/server.properties"
+if [ -f "\$PROPS" ]; then
+    if grep -q '^transport=' "\$PROPS"; then
+        sed -i 's/^transport=.*/transport=nethernet/' "\$PROPS"
+    else
+        printf '\ntransport=nethernet\n' >> "\$PROPS"
+    fi
+    grep -q '^server-udp-ports=.' "\$PROPS" || { sed -i '/^server-udp-ports=/d' "\$PROPS"; echo 'server-udp-ports=19140-19155' >> "\$PROPS"; }
+fi
 pkill -f bedrock_server 2>/dev/null || true
 sleep 2
 STARTED=0
