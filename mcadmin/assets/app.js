@@ -353,6 +353,11 @@ async function conSend(){
   const r=await api('console_send',{cmd});
   if(!r.success)toast(r.message||'Befehl konnte nicht gesendet werden','warn');
 }
+// iOS/iPadOS kennt die Minecraft-Endungen (.mcaddon/.mcpack/.mcworld) nicht als Dateitypen und
+// graut solche Dateien in der Auswahl aus, wenn accept gesetzt ist. Auf iOS den Filter daher kurz
+// vor dem Öffnen entfernen — der Server prüft die Endung beim Upload ohnehin selbst.
+const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+if(IS_IOS)document.addEventListener('click',ev=>{const t=ev.target;if(t&&t.tagName==='INPUT'&&t.type==='file')t.removeAttribute('accept');},true);
 document.addEventListener('DOMContentLoaded',function(){
   // Konsolen-Verlauf aus localStorage laden
   try{G.conHist=JSON.parse(localStorage.getItem('mcadmin_conHist')||'[]');}catch(e){}
