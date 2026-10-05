@@ -766,6 +766,7 @@ level-seed=
 default-player-permission-level=member
 texturepack-required=false
 content-log-file-enabled=false
+content-log-console-output-enabled=true
 compression-threshold=1
 server-authoritative-movement=server-auth
 server-authoritative-block-breaking=false

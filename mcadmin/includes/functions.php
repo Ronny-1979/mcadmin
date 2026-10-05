@@ -39,7 +39,7 @@ function server_start(): array {
     // Packs und Experimente (z.B. holiday_creator_features) vor dem Start sicherstellen
     $activeWorld = get_active_world();
     if ($activeWorld) apply_world_packs($activeWorld);
-    ensure_nethernet_for_active_world();
+    ensure_required_properties_for_active_world();
 
     exec('sudo systemctl start ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
     if ($code === 0) {
@@ -73,7 +73,7 @@ function server_restart(): array {
     // Packs und Experimente (z.B. holiday_creator_features) vor dem Neustart sicherstellen
     $activeWorld = get_active_world();
     if ($activeWorld) apply_world_packs($activeWorld);
-    ensure_nethernet_for_active_world();
+    ensure_required_properties_for_active_world();
 
     exec('sudo systemctl stop ' . escapeshellarg(MC_SERVICE_NAME) . ' 2>&1', $out, $code);
     if ($code !== 0) {
@@ -616,21 +616,32 @@ function set_server_property(string $key, string $value, ?string $file = null): 
 // die neue Datei von Mojang — deshalb vor jedem Start sicherstellen. Ältere BDS-Versionen
 // ignorieren unbekannte Keys, ein Downgrade ist dadurch also unproblematisch.
 // server-udp-ports wird nur gesetzt, wenn es fehlt (passend zu den Firewall-Regeln aus install.sh).
-function ensure_nethernet_properties(?string $file = null): void {
+// Außerdem immer Content-Log in der Konsole aktiv lassen, damit Addon-/Script-Fehler (z.B. fehlende
+// Experimente) im Server-Log und im Panel sichtbar sind.
+function ensure_required_properties(?string $file = null): void {
     $file ??= MC_PROPERTIES_FILE;
     if (!file_exists($file)) return;
     $props  = get_all_properties($file);
     $values = [];
     if (strtolower(trim((string)($props['transport'] ?? ''))) !== 'nethernet') $values['transport'] = 'nethernet';
     if (trim((string)($props['server-udp-ports'] ?? '')) === '') $values['server-udp-ports'] = '19140-19155';
+    if (strtolower(trim((string)($props['content-log-console-output-enabled'] ?? ''))) !== 'true') $values['content-log-console-output-enabled'] = 'true';
     if ($values) set_properties($values, $file);
+
+    // Ein leeres "server-ip=" lässt BDS 1.26.5x nicht mehr auf server-port lauschen (kein
+    // "Accepting clients on ..." im Log, niemand kann beitreten) -> leere Zeile entfernen.
+    if (array_key_exists('server-ip', $props) && trim((string)$props['server-ip']) === '') {
+        $entries = array_values(array_filter(parse_properties($file),
+            fn($e) => !($e['type'] === 'property' && $e['key'] === 'server-ip')));
+        file_put_contents($file, serialize_properties($entries));
+    }
 }
 
-// Wendet ensure_nethernet_properties() auf die aktive server.properties und die welt-eigene Kopie an
-function ensure_nethernet_for_active_world(): void {
-    ensure_nethernet_properties(MC_PROPERTIES_FILE);
+// Wendet ensure_required_properties() auf die aktive server.properties und die welt-eigene Kopie an
+function ensure_required_properties_for_active_world(): void {
+    ensure_required_properties(MC_PROPERTIES_FILE);
     $active = get_active_world();
-    if ($active && file_exists(world_properties_file($active))) ensure_nethernet_properties(world_properties_file($active));
+    if ($active && file_exists(world_properties_file($active))) ensure_required_properties(world_properties_file($active));
 }
 
 // Gibt den Pfad zur welt-eigenen .server.properties-Datei zurück
@@ -650,7 +661,7 @@ function load_world_properties(string $worldName): bool {
     if (file_exists($src)) {
         if (!copy($src, MC_PROPERTIES_FILE)) return false;
         set_server_property('level-name', $worldName);
-        ensure_nethernet_properties(MC_PROPERTIES_FILE);
+        ensure_required_properties(MC_PROPERTIES_FILE);
         return true;
     }
     return set_server_property('level-name', $worldName);
@@ -1203,6 +1214,7 @@ if (file_exists($destLevelDat)) {
     if (!empty($packUuids['behavior'])) {
         $props['content-log-file-enabled'] = 'true';
     }
+    $props['content-log-console-output-enabled'] = 'true';
 
     $lines = [];
     foreach ($props as $k => $v) {
@@ -1574,6 +1586,7 @@ function create_world(string $worldName, array $options = []): array {
     'default-player-permission-level' => 'member',
     'texturepack-required' => 'false',
     'content-log-file-enabled' => 'false',
+    'content-log-console-output-enabled' => 'true',
     'compression-threshold' => '1',
     'server-authoritative-movement' => 'server-auth',
     'server-authoritative-block-breaking' => 'true',
@@ -3182,6 +3195,12 @@ if [ -f "\$PROPS" ]; then
         printf '\ntransport=nethernet\n' >> "\$PROPS"
     fi
     grep -q '^server-udp-ports=.' "\$PROPS" || { sed -i '/^server-udp-ports=/d' "\$PROPS"; echo 'server-udp-ports=19140-19155' >> "\$PROPS"; }
+    sed -i '/^server-ip=\s*$/d' "\$PROPS"
+    if grep -q '^content-log-console-output-enabled=' "\$PROPS"; then
+        sed -i 's/^content-log-console-output-enabled=.*/content-log-console-output-enabled=true/' "\$PROPS"
+    else
+        echo 'content-log-console-output-enabled=true' >> "\$PROPS"
+    fi
 fi
 pkill -f bedrock_server 2>/dev/null || true
 sleep 2
