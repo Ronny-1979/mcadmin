@@ -915,7 +915,7 @@ const SCHEMA=[
   {S:'Logging'},
   {k:'content-log-file-enabled',l:'Content-Log in Datei',t:'bool'},
   {k:'content-log-level',l:'Content-Log Level',t:'sel',o:['error','warning','info','verbose']},
-  {k:'content-log-console-output-enabled',l:'Content-Log in Konsole',t:'bool'},
+  {k:'content-log-console-output-enabled',l:'Content-Log in Konsole',t:'bool',d:'Wird vom Panel vor jedem Start automatisch aktiviert, damit Addon-/Script-Fehler im Log sichtbar sind'},
   {k:'broadcast-console-to-ops',l:'Konsole an OPs senden',t:'bool'},
   {S:'Script-Watchdog'},
   {k:'allow-outbound-script-debugging',l:'Ausgehendes Script-Debugging',t:'bool',d:'Erlaubt /script debugger connect zu einem externen Debugger (z.B. VS Code). Standard: aus'},
