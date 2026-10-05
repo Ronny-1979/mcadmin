@@ -1537,6 +1537,8 @@ function create_world(string $worldName, array $options = []): array {
     'white-list' => 'false',
     'server-port' => '19132',
     'server-portv6' => '19133',
+    // NetherNet (BDS 26.50+): festen UDP-Bereich nutzen, passend zu den Firewall-Regeln aus install.sh
+    'server-udp-ports' => '19140-19155',
     'view-distance' => '10',
     'tick-distance' => '4',
     'player-idle-timeout' => '30',
@@ -3476,17 +3478,48 @@ function experiment_log_aliases(): array {
     ];
 }
 
+// Prüft die Manifeste der aktiven Behavior Packs einer Welt auf Script-Module in einer Beta-Version
+// (z.B. "@minecraft/server" "2.1.0-beta") — solche Packs brauchen das „Beta APIs“-Experiment
+// (NBT-Key "gametest"). Funktioniert unabhängig vom Log-Format des Servers, also auch, wenn eine
+// neue BDS-Version die Fehlermeldung umformuliert, und schon bevor der Server einmal gestartet ist.
+// Rückgabe: Experiment-Key => Name des ersten Packs, das es benötigt.
+function detect_pack_required_experiments(string $worldName): array {
+    $found = [];
+    foreach ((get_world_packs($worldName)['behavior'] ?? []) as $ref) {
+        if (($ref['enabled'] ?? true) === false) continue;
+        $version = ($ref['version'] ?? '?') === '?' ? null : $ref['version'];
+        $inst = find_installed_pack('behavior', $ref['uuid'], $version)
+             ?? find_installed_pack('behavior', $ref['uuid']);
+        if (!$inst || empty($inst['folder'])) continue;
+
+        $mf = json_decode((string)@file_get_contents(MC_PACKS_BEHAVIOR_DIR . '/' . $inst['folder'] . '/manifest.json'), true);
+        if (!is_array($mf)) continue;
+        foreach (($mf['dependencies'] ?? []) as $dep) {
+            if (!is_array($dep) || empty($dep['module_name'])) continue;
+            $ver = $dep['version'] ?? '';
+            if (is_string($ver) && stripos($ver, 'beta') !== false) {
+                if (!isset($found['gametest'])) $found['gametest'] = (string)($inst['name'] ?? $ref['name'] ?? $ref['uuid']);
+                break;
+            }
+        }
+    }
+    return $found;
+}
+
 // Durchsucht die aktuellste Startphase des Server-Logs nach bekannten "Experiment X fehlt"-
 // Meldungen und meldet, welches Experiment für die aktive Welt noch fehlt. Bereits aktivierte
 // Experimente (Nutzer hat es schon behoben, aber noch nicht neugestartet) werden nicht mehr
 // gemeldet, ebenso Meldungen aus einem früheren Serverstart vor dem letzten "Starting Server".
+// Zusätzlich werden die Manifeste der aktiven Packs geprüft (detect_pack_required_experiments()),
+// da sich das Log-Format zwischen BDS-Versionen ändern kann (z.B. 26.x).
 function detect_missing_experiments(): array {
     $activeWorld = get_active_world();
     if (!$activeWorld) return [];
 
+    $found = detect_pack_required_experiments($activeWorld); // key => Pack-Name
+
     $log   = get_log_lines(400);
     $lines = $log['lines'] ?? [];
-    if (!$lines) return [];
 
     // Nur ab dem letzten Serverstart betrachten, keine Meldungen aus älteren Läufen
     $startIdx = 0;
@@ -3496,17 +3529,23 @@ function detect_missing_experiments(): array {
     $lines = array_slice($lines, $startIdx);
 
     $aliases = experiment_log_aliases();
-    $found   = []; // key => Pack-Name
 
     foreach ($lines as $line) {
-        if (!preg_match(
-            '/\[Scripting\]\s*Plugin\s*\[(.+)\]\s*-\s*requesting dependency on beta APIs\s*\[.+?\],\s*but the (.+?) experiment is not enabled\.?/i',
-            $line, $m
-        )) continue;
+        // Bekannte Varianten (ältere und neuere BDS-Versionen):
+        //   [Scripting] Plugin [Name - 1.0.0] - requesting dependency on beta APIs [@minecraft/server - 2.1.0-beta], but the Beta APIs experiment is not enabled.
+        //   [Scripting][error]-Plugin requesting dependency on beta APIs [...], but the "Beta APIs" experiment is not enabled
+        if (stripos($line, 'beta api') === false || !preg_match('/not\s+enabled/i', $line)) continue;
 
-        $key = $aliases[strtolower(trim($m[2]))] ?? null;
+        $key = null;
+        if (preg_match('/the\s+["\x{201C}\x{201E}\']?(.+?)["\x{201D}\x{201C}\']?\s+experiment\s+is\s+not\s+enabled/iu', $line, $m)) {
+            $key = $aliases[strtolower(trim($m[1]))] ?? null;
+        }
+        // Nur Beta-APIs-Abhängigkeitszeilen ohne erkennbaren Experiment-Namen sicher zuordnen
+        if ($key === null && stripos($line, 'requesting dependency on beta APIs') !== false) $key = 'gametest';
         if ($key === null) continue; // unbekanntes/neues Muster -> lieber nichts anzeigen als raten
-        if (!isset($found[$key])) $found[$key] = trim($m[1]);
+
+        $pack = preg_match('/Plugin\s*\[([^\]]+)\]/i', $line, $pm) ? trim($pm[1]) : 'Unbekanntes Script-Pack';
+        if (!isset($found[$key])) $found[$key] = $pack;
     }
     if (!$found) return [];
 

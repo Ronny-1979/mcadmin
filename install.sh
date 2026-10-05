@@ -28,6 +28,11 @@ WEB_PORT=80
 HTTPS_PORT=443
 MC_PORT_UDP=19132
 MC_PORT_UDP6=19133
+# Ab BDS 26.50 ist NetherNet (WebRTC) der Standard-Transport: TCP auf server-port für den
+# Verbindungsaufbau (Signaling, GET /v1/join) + UDP-Bereich fürs Gameplay (server-udp-ports).
+MC_PORT_TCP=19132
+MC_NN_UDP_FROM=19140
+MC_NN_UDP_TO=19155
 LOG_FILE="/var/log/mcadmin-install.log"
 VERSION_FILE="${PANEL_DIR}/.mcadmin_version"
 
@@ -168,6 +173,7 @@ if [ "$MODE" = "uninstall" ]; then
     if command -v fuser &>/dev/null; then
         fuser -k 19132/udp 2>/dev/null || true
         fuser -k 19133/udp 2>/dev/null || true
+        fuser -k 19132/tcp 2>/dev/null || true
     fi
     sleep 1
     ok "Minecraft Server gestoppt und Ports freigegeben"
@@ -192,10 +198,16 @@ if [ "$MODE" = "uninstall" ]; then
     hdr "5/6" "Firewall-Regeln entfernen"
     if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "active"; then
         ufw delete allow "${MC_PORT_UDP}/udp" >/dev/null 2>&1 && ok "UFW MC-Port entfernt" || true
+        ufw delete allow "${MC_PORT_UDP6}/udp" >/dev/null 2>&1 || true
+        ufw delete allow "${MC_PORT_TCP}/tcp" >/dev/null 2>&1 || true
+        ufw delete allow "${MC_NN_UDP_FROM}:${MC_NN_UDP_TO}/udp" >/dev/null 2>&1 || true
         ufw delete allow "${WEB_PORT}/tcp"    >/dev/null 2>&1 || true
         ufw delete allow "${HTTPS_PORT}/tcp"  >/dev/null 2>&1 && ok "UFW HTTPS-Port entfernt" || true
     elif command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
         firewall-cmd --remove-port=${MC_PORT_UDP}/udp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --remove-port=${MC_PORT_UDP6}/udp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --remove-port=${MC_PORT_TCP}/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --remove-port=${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/udp --permanent >/dev/null 2>&1 || true
         firewall-cmd --remove-service=http --permanent >/dev/null 2>&1 || true
         firewall-cmd --remove-service=https --permanent >/dev/null 2>&1 || true
         firewall-cmd --reload >/dev/null 2>&1 && ok "firewalld-Regeln entfernt" || true
@@ -262,6 +274,8 @@ if [ "$MODE" = "uninstall" ]; then
             _PROCS=$(fuser ${_PORT}/udp 2>/dev/null || true)
             [ -n "$_PROCS" ] && warn "Port ${_PORT}/udp noch belegt durch PID: ${_PROCS}" && LEFTOVER=true
         done
+        _PROCS=$(fuser ${MC_PORT_TCP}/tcp 2>/dev/null || true)
+        [ -n "$_PROCS" ] && warn "Port ${MC_PORT_TCP}/tcp noch belegt durch PID: ${_PROCS}" && LEFTOVER=true
     fi
     $LEFTOVER || ok "Alle Ports und Prozesse sauber"
 
@@ -376,6 +390,23 @@ PANEL_SCRIPT_EOF
         sed -i 's/KillMode=mixed/KillMode=control-group/' "$SVC_FILE"
         systemctl daemon-reload
         ok "Service-Datei migriert: KillMode=control-group (Port-Fix)"
+    fi
+    # NetherNet (BDS 26.50+): Bestehende Firewall-Freigaben um TCP-Port + UDP-Bereich ergänzen,
+    # aber nur wenn der Minecraft-Port bereits freigegeben war (Nutzerentscheidung respektieren).
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+        if ufw status | grep -q "^${MC_PORT_UDP}/udp" && ! ufw status | grep -q "^${MC_PORT_TCP}/tcp"; then
+            ufw allow ${MC_PORT_TCP}/tcp >/dev/null 2>&1
+            ufw allow ${MC_NN_UDP_FROM}:${MC_NN_UDP_TO}/udp >/dev/null 2>&1
+            ok "UFW: NetherNet-Ports ergänzt (${MC_PORT_TCP}/TCP, ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)"
+        fi
+    elif command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+        if firewall-cmd --query-port=${MC_PORT_UDP}/udp --permanent >/dev/null 2>&1 \
+           && ! firewall-cmd --query-port=${MC_PORT_TCP}/tcp --permanent >/dev/null 2>&1; then
+            firewall-cmd --add-port=${MC_PORT_TCP}/tcp --permanent >/dev/null 2>&1
+            firewall-cmd --add-port=${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/udp --permanent >/dev/null 2>&1
+            firewall-cmd --reload >/dev/null 2>&1
+            ok "firewalld: NetherNet-Ports ergänzt (${MC_PORT_TCP}/TCP, ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)"
+        fi
     fi
     for phpini in "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/8.2/apache2/php.ini" "/etc/php/8.1/apache2/php.ini" "/etc/php/php.ini" "/etc/php.ini"; do
         if [ -f "$phpini" ]; then
@@ -739,6 +770,7 @@ compression-threshold=1
 server-authoritative-movement=server-auth
 server-authoritative-block-breaking=false
 correct-player-movement=false
+server-udp-ports=19140-19155
 EOF
     ok "server.properties Vorlage erstellt"
 fi
@@ -854,6 +886,7 @@ tmux kill-session -t minecraft 2>/dev/null || true
 if command -v fuser &>/dev/null; then
     fuser -k 19132/udp 2>/dev/null || true
     fuser -k 19133/udp 2>/dev/null || true
+    fuser -k ${MC_PORT_TCP}/tcp 2>/dev/null || true
 fi
 sleep 1
 
@@ -1023,10 +1056,12 @@ command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/
 
 configure_ufw() {
     echo ""
-    if ask "Minecraft Port ${MC_PORT_UDP}/UDP für Spieler öffnen?"; then
+    if ask "Minecraft Ports für Spieler öffnen (${MC_PORT_UDP}/UDP+TCP, NetherNet ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)?"; then
         ufw allow ${MC_PORT_UDP}/udp  >/dev/null 2>&1
         ufw allow ${MC_PORT_UDP6}/udp >/dev/null 2>&1
-        ok "UFW: Minecraft Ports geöffnet (${MC_PORT_UDP}/UDP, ${MC_PORT_UDP6}/UDP)"
+        ufw allow ${MC_PORT_TCP}/tcp  >/dev/null 2>&1
+        ufw allow ${MC_NN_UDP_FROM}:${MC_NN_UDP_TO}/udp >/dev/null 2>&1
+        ok "UFW: Minecraft Ports geöffnet (${MC_PORT_UDP}/UDP, ${MC_PORT_UDP6}/UDP, ${MC_PORT_TCP}/TCP, ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)"
     fi
     if $LETSENCRYPT_DONE; then
         ufw allow ${HTTPS_PORT}/tcp >/dev/null 2>&1
@@ -1059,11 +1094,13 @@ elif $UFW_AVAILABLE; then
     fi
 elif $FIREWALLD_ACTIVE; then
     ok "firewalld ist aktiv"
-    if ask "Minecraft Port ${MC_PORT_UDP}/UDP öffnen?"; then
+    if ask "Minecraft Ports öffnen (${MC_PORT_UDP}/UDP+TCP, NetherNet ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)?"; then
         firewall-cmd --add-port=${MC_PORT_UDP}/udp  --permanent >/dev/null 2>&1
         firewall-cmd --add-port=${MC_PORT_UDP6}/udp --permanent >/dev/null 2>&1
+        firewall-cmd --add-port=${MC_PORT_TCP}/tcp  --permanent >/dev/null 2>&1
+        firewall-cmd --add-port=${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/udp --permanent >/dev/null 2>&1
         firewall-cmd --reload >/dev/null 2>&1
-        ok "firewalld: Minecraft Ports geöffnet (${MC_PORT_UDP}/UDP, ${MC_PORT_UDP6}/UDP)"
+        ok "firewalld: Minecraft Ports geöffnet (${MC_PORT_UDP}/UDP, ${MC_PORT_UDP6}/UDP, ${MC_PORT_TCP}/TCP, ${MC_NN_UDP_FROM}-${MC_NN_UDP_TO}/UDP)"
     fi
     if $LETSENCRYPT_DONE; then
         firewall-cmd --add-service=https --permanent >/dev/null 2>&1
