@@ -55,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/Ronny-1979/mcadmin/main/install.sh 
 | 8 | 🔒 *Optional:* Let's Encrypt — Domain, Certbot, HTTPS + Auto-Renewal |
 | 9 | 🛡️ *Optional:* Firewall-Ports freigeben (UFW / firewalld) |
 
-> **Ports ab Bedrock 26.50 (NetherNet):** Der Server nutzt standardmäßig den neuen Transport `nethernet` (WebRTC). Dafür müssen **TCP 19132** (Verbindungsaufbau) und der UDP-Bereich **19140–19155** (`server-udp-ports`) offen bzw. im Router weitergeleitet sein — zusätzlich zu den bisherigen UDP-Ports 19132/19133. Bei Verbindungsproblemen (z.B. iOS-Clients) kann im Properties-Editor `transport=raknet` gesetzt werden; dann reicht wie früher UDP 19132.
+> **Ports ab Bedrock 26.50 (NetherNet):** Ab BDS 1.26.5x ist `transport=nethernet` (WebRTC) der einzige unterstützte Transport — das Panel setzt ihn vor jedem Start automatisch in die `server.properties`. Dafür müssen **TCP 19132** (Verbindungsaufbau) und der UDP-Bereich **19140–19155** (`server-udp-ports`) offen bzw. im Router weitergeleitet sein, zusätzlich zu den bisherigen UDP-Ports 19132/19133.
 
 ---
 
