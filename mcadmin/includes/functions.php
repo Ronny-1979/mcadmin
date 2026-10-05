@@ -182,6 +182,18 @@ function get_server_version(): string {
     return $m[1] ?? 'unbekannt';
 }
 
+// min_engine_version aus einem Manifest als [major, minor, patch]. Manifest format_version 2 nutzt
+// ein Array ([1, 21, 0]), format_version 3 einen String ("1.21.0") — beide werden unterstützt.
+// null = fehlt/unbrauchbar (kein Versions-Check möglich).
+function normalize_min_engine_version($minVer): ?array {
+    if (is_string($minVer)) {
+        if (!preg_match('/^\s*\d+\.\d+/', $minVer)) return null;
+        return pack_version_array($minVer);
+    }
+    if (!is_array($minVer) || count($minVer) < 2) return null;
+    return array_values($minVer);
+}
+
 // Vergleicht ein Pack-min_engine_version-Array (3-teilig) gegen die installierte BDS-Version.
 // true = Pack verlangt eine höhere Engine-Version als aktuell installiert ist.
 function pack_requires_higher_engine(array $minVer, array $bdParts): bool {
@@ -209,8 +221,8 @@ function check_world_compat_issues(string $worldRoot, string $bdVersion): array 
                 $manifest = $base . '/' . $pack . '/manifest.json';
                 if (!file_exists($manifest)) continue;
                 $data   = json_decode((string)file_get_contents($manifest), true);
-                $minVer = $data['header']['min_engine_version'] ?? null;
-                if (!is_array($minVer) || count($minVer) < 2) continue;
+                $minVer = normalize_min_engine_version($data['header']['min_engine_version'] ?? null);
+                if ($minVer === null) continue;
                 if (pack_requires_higher_engine($minVer, $bdParts)) {
                     $issues[] = [
                         'type'      => $packDir === 'behavior_packs' ? 'Behavior' : 'Resource',
@@ -264,8 +276,8 @@ function detect_engine_version_issues(): array {
             if (!file_exists($manifest)) continue;
             $data   = json_decode((string)file_get_contents($manifest), true) ?: [];
             $header = $data['header'] ?? [];
-            $minVer = $header['min_engine_version'] ?? null;
-            if (!is_array($minVer) || count($minVer) < 2) continue;
+            $minVer = normalize_min_engine_version($header['min_engine_version'] ?? null);
+            if ($minVer === null) continue;
 
             $isBuiltin = is_builtin_bedrock_pack($folder, $data);
             $uuid      = strtolower($header['uuid'] ?? '');
