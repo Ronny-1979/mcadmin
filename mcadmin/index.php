@@ -661,7 +661,7 @@ try {
 </div><!-- /layout -->
 <div id="tc"></div>
 
-<script src="assets/app.js?v=32" defer></script>
+<script src="assets/app.js?v=33" defer></script>
 <?php endif; ?>
 </body>
 </html>

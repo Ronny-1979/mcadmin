@@ -870,6 +870,7 @@ const SCHEMA=[
   {k:'force-gamemode',l:'Spielmodus erzwingen',t:'bool',d:'Setzt Spielmodus beim Beitritt zurück'},
   {k:'difficulty',l:'Schwierigkeit',t:'sel',o:['peaceful','easy','normal','hard']},
   {k:'hardcore',l:'Hardcore-Modus',t:'bool',d:'Permadeath – Welt wird bei Tod gelöscht'},
+  {k:'allow-cheats',l:'Cheats erlauben',t:'bool',d:'Nötig für Befehle wie /give, /summon, /gamemode — auch im Kreativmodus. Neustart erforderlich'},
   {k:'max-players',l:'Max. Spieler',t:'num',min:1,max:30},
   {k:'server-port',l:'IPv4 Port',t:'num',min:1,max:65535,d:'RakNet: UDP · NetherNet: TCP (Verbindungsaufbau)'},
   {k:'server-portv6',l:'IPv6 Port',t:'num',min:1,max:65535},
