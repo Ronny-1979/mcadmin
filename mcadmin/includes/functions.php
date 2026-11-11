@@ -2547,6 +2547,7 @@ function install_pack(string $tmpPath, string $originalName): array {
     exec('rm -rf ' . escapeshellarg($tmpDir));
     if (empty($results)) return ['success' => false, 'message' => 'Kein gültiges Pack gefunden'];
     $msg = implode(', ', array_map(fn($r) => "{$r['name']} ({$r['type']} pack)", $results));
+    $msg .= addon_check_summary($results);
     return ['success' => true, 'message' => $msg, 'installed' => $results];
 }
 
@@ -2578,7 +2579,7 @@ function install_pack_for_world(string $tmpPath, string $originalName, string $w
     }
     if ($activated > 0) apply_world_packs($worldName);
     $count = count($r['installed']);
-    return ['success' => true, 'message' => "$count Pack(s) installiert und für '$worldName' aktiviert"];
+    return ['success' => true, 'message' => "$count Pack(s) installiert und für '$worldName' aktiviert" . addon_check_summary($r['installed'])];
 }
 
 // Löscht ein selbst installiertes Pack: deaktiviert es in allen Welten, entfernt den Ordner.
@@ -3695,4 +3696,225 @@ function extract_zip(string $file, string $dest): bool {
     if(class_exists('ZipArchive')){$zip=new ZipArchive();if($zip->open($file)===true){$zip->extractTo($dest);$zip->close();return true;}}
     exec('unzip -o '.escapeshellarg($file).' -d '.escapeshellarg($dest).' 2>&1',$out,$code);
     return $code===0;
+}
+
+// ============================================================
+// ADDON-CHECK (Kompatibilität von Packs mit der Server-Version)
+// ============================================================
+
+defined('MC_SCRIPT_API_CACHE') || define('MC_SCRIPT_API_CACHE', __DIR__ . '/../script_api_cache.json');
+defined('MC_SCRIPT_API_CACHE_TTL') || define('MC_SCRIPT_API_CACHE_TTL', 43200); // 12h
+
+// Liest die zwischengespeicherten Script-API-Versionen (je Modul die Liste der "-stable"-Betas von npm)
+function script_api_cache_read(): array {
+    if (!file_exists(MC_SCRIPT_API_CACHE)) return ['modules' => []];
+    $c = json_decode((string)file_get_contents(MC_SCRIPT_API_CACHE), true);
+    return is_array($c) ? $c + ['modules' => []] : ['modules' => []];
+}
+
+// Lädt für ein Script-Modul (z.B. "@minecraft/server") die veröffentlichten Beta-Versionen von npm.
+// Mojang veröffentlicht dort zu jeder Minecraft-Version die passende Beta, z.B.
+// "2.11.0-beta.1.26.52-stable" = Beta-API "2.11.0-beta" für Minecraft/BDS 1.26.52.
+// Gespeichert werden nur diese "-stable"-Einträge, damit der Cache klein bleibt.
+// Fehlschläge werden ebenfalls gemerkt, damit nicht jeder Seitenaufruf erneut 15 s wartet.
+function script_api_fetch_module(string $module, array &$cache): void {
+    $url  = 'https://registry.npmjs.org/' . str_replace('/', '%2f', $module);
+    $json = shell_exec('curl -sL --compressed --max-time 15 -H ' . escapeshellarg('Accept: application/vnd.npm.install-v1+json')
+        . ' ' . escapeshellarg($url) . ' 2>/dev/null') ?: '';
+    $data = $json ? json_decode($json, true) : null;
+    $entry = ['fetched' => time(), 'ok' => false, 'betas' => []];
+    if (is_array($data) && isset($data['versions']) && is_array($data['versions'])) {
+        foreach (array_keys($data['versions']) as $v) {
+            if (preg_match('/^\d+\.\d+\.\d+-beta\.\d+\.\d+\.\d+-stable$/', $v)) $entry['betas'][] = $v;
+        }
+        $entry['ok'] = true;
+    }
+    // Bei Netzwerkfehler alte, gültige Daten behalten (nur Zeitstempel für die Wartezeit erneuern)
+    if (!$entry['ok'] && !empty($cache['modules'][$module]['betas'])) {
+        $cache['modules'][$module]['fetched'] = time();
+        return;
+    }
+    $cache['modules'][$module] = $entry;
+}
+
+// Ermittelt die Beta-Version eines Script-Moduls, die zur installierten Server-Version passt
+// (z.B. "@minecraft/server" auf BDS 1.26.52.3 -> "2.11.0-beta"). null = unbekannt.
+// $allowFetch=false: nur Cache verwenden (für den häufigen Status-Abruf, nie Netzwerk).
+function script_api_expected_beta(string $module, bool $allowFetch = true): ?string {
+    static $cache = null;
+    $bd = array_map('intval', array_slice(explode('.', get_server_version()), 0, 3));
+    if (count($bd) < 3 || $bd[0] <= 0) return null;
+
+    $cache ??= script_api_cache_read();
+    $resolve = function () use (&$cache, $module, $bd): ?string {
+        $best = null; $bestPatch = -1;
+        foreach (($cache['modules'][$module]['betas'] ?? []) as $v) {
+            if (!preg_match('/^(\d+\.\d+\.\d+)-beta\.(\d+)\.(\d+)\.(\d+)-stable$/', $v, $m)) continue;
+            [$ma, $mi, $pa] = [(int)$m[2], (int)$m[3], (int)$m[4]];
+            if ($ma !== $bd[0] || $mi !== $bd[1]) continue;
+            if ($pa === $bd[2]) return $m[1] . '-beta';               // exakter Treffer
+            // Hotfix ohne eigenen npm-Eintrag: gleiche Release-Reihe (z.B. 1.26.5x), nächstniedriger Patch
+            if (intdiv($pa, 10) === intdiv($bd[2], 10) && $pa < $bd[2] && $pa > $bestPatch) {
+                $best = $m[1] . '-beta'; $bestPatch = $pa;
+            }
+        }
+        return $best;
+    };
+
+    $found = $resolve();
+    $age   = time() - (int)($cache['modules'][$module]['fetched'] ?? 0);
+    // Neu laden, wenn das Modul noch nie geladen wurde, der Cache alt ist oder die aktuelle
+    // Server-Version (z.B. direkt nach einem Update) noch nicht drinsteht — max. 1x pro Stunde.
+    if ($allowFetch && ($age > MC_SCRIPT_API_CACHE_TTL || ($found === null && $age > 3600))) {
+        script_api_fetch_module($module, $cache);
+        @file_put_contents(MC_SCRIPT_API_CACHE, json_encode($cache));
+        $found = $resolve();
+    }
+    return $found;
+}
+
+// Prüft ein installiertes Pack auf bekannte Ursachen, warum Addons nach Minecraft-Updates nicht
+// mehr laufen. Rückgabe: status (ok|info|warn|error), findings (je level, text, fixable) und
+// fixable (true, wenn „Reparieren“ etwas ändern kann). $scanFiles=false überspringt die Prüfungen,
+// die Pack-Ordner durchsuchen (für den häufigen Status-Abruf, der nur Reparierbares braucht).
+function analyze_pack(string $type, string $folder, bool $allowFetch = true, bool $scanFiles = true): array {
+    $dir  = ($type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR) . '/' . $folder;
+    $mf   = json_decode((string)@file_get_contents($dir . '/manifest.json'), true);
+    $out  = ['status' => 'ok', 'findings' => [], 'fixable' => false];
+    $rank = ['ok' => 0, 'info' => 1, 'warn' => 2, 'error' => 3];
+    $add  = function (string $level, string $text, bool $fixable = false) use (&$out, $rank) {
+        $out['findings'][] = ['level' => $level, 'text' => $text, 'fixable' => $fixable];
+        if ($rank[$level] > $rank[$out['status']]) $out['status'] = $level;
+        if ($fixable) $out['fixable'] = true;
+    };
+    if (!is_array($mf)) {
+        $add('warn', 'manifest.json nicht lesbar (evtl. Kommentare oder Syntaxfehler) — Prüfung nicht möglich');
+        return $out;
+    }
+
+    $bdVersion = get_server_version();
+    $bdParts   = array_map('intval', array_slice(explode('.', $bdVersion), 0, 3));
+    $bdKnown   = count($bdParts) === 3 && $bdParts[0] > 0;
+
+    // 1. Mindestversion höher als der Server
+    $minVer = normalize_min_engine_version($mf['header']['min_engine_version'] ?? null);
+    if ($bdKnown && $minVer !== null && pack_requires_higher_engine($minVer, $bdParts)) {
+        $add('error', 'Braucht mindestens Minecraft ' . implode('.', array_pad(array_slice($minVer, 0, 3), 3, 0))
+            . ', Server hat ' . implode('.', $bdParts) . ' — Server aktualisieren');
+    }
+
+    // 2. Script-Module (Hauptursache: Beta-Versionen gibt es nur in genau einer Minecraft-Version)
+    foreach (($mf['dependencies'] ?? []) as $dep) {
+        if (!is_array($dep)) continue;
+        $module = (string)($dep['module_name'] ?? '');
+        $ver    = $dep['version'] ?? '';
+        if ($module === '') continue;
+        if (!str_starts_with($module, '@minecraft/')) {
+            $add('error', "Uraltes Script-Modul „{$module}“ (vor 2023) — wird nicht mehr unterstützt, nicht reparierbar");
+            continue;
+        }
+        if (!is_string($ver)) continue;
+        if (stripos($ver, 'beta') !== false) {
+            if (!$bdKnown) continue;
+            $expected = script_api_expected_beta($module, $allowFetch);
+            if ($expected === null) {
+                $add('info', "{$module} {$ver}: passende Beta-Version für Server " . implode('.', $bdParts) . ' unbekannt (keine Verbindung zu npm?)');
+            } elseif (strcasecmp($ver, $expected) !== 0) {
+                $add('error', "{$module} {$ver} passt nicht zum Server (braucht {$expected}) — Scripts starten so nicht", true);
+            }
+        } elseif ($bdKnown) {
+            // Stabile Version: neuer als die aktuelle Beta-Basis -> auf diesem Server noch nicht verfügbar
+            $expected = script_api_expected_beta($module, $allowFetch);
+            if ($expected !== null && version_compare($ver, substr($expected, 0, -5), '>=')) {
+                $add('warn', "{$module} {$ver} ist vermutlich neuer als dieser Server — Server aktualisieren");
+            }
+        }
+    }
+
+    // 3. Überschreibt den Vanilla-Spieler (kann nach Updates und mit anderen Addons Probleme machen)
+    if ($scanFiles && $type === 'behavior' && is_dir($dir . '/entities')) {
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir . '/entities', FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $f) {
+            if (!$f->isFile() || strtolower($f->getExtension()) !== 'json') continue;
+            if (preg_match('/"identifier"\s*:\s*"minecraft:player"/', (string)@file_get_contents($f->getPathname()))) {
+                $add('info', 'Überschreibt den Spieler (player.json) — kann nach Updates oder mit anderen Addons, die das auch tun, Probleme machen');
+                break;
+            }
+        }
+    }
+
+    // 4. Eigene Materialien/Shader (seit RenderDragon nicht mehr unterstützt)
+    if ($scanFiles && $type === 'resource' && (is_dir($dir . '/materials') || is_dir($dir . '/shaders'))) {
+        $add('warn', 'Enthält eigene Materialien/Shader — werden seit RenderDragon nicht mehr unterstützt');
+    }
+
+    return $out;
+}
+
+// Repariert, was sich gefahrlos automatisch reparieren lässt: veraltete Beta-Versionen von
+// Script-Modulen werden auf die Version gesetzt, die zum installierten Server passt.
+// Das Original-Manifest wird einmalig als manifest.json.mcadmin_orig gesichert.
+// Ob das Addon danach läuft, hängt davon ab, ob die genutzten Funktionen noch existieren.
+function fix_pack(string $type, string $folder): array {
+    $dir = ($type === 'behavior' ? MC_PACKS_BEHAVIOR_DIR : MC_PACKS_RESOURCE_DIR) . '/' . $folder;
+    $mfFile = $dir . '/manifest.json';
+    $raw = (string)@file_get_contents($mfFile);
+    $mf  = json_decode($raw, true);
+    if (!is_array($mf)) return ['success' => false, 'message' => 'manifest.json nicht lesbar'];
+
+    $changes = [];
+    foreach (($mf['dependencies'] ?? []) as $i => $dep) {
+        $module = (string)($dep['module_name'] ?? '');
+        $ver    = $dep['version'] ?? '';
+        if (!str_starts_with($module, '@minecraft/') || !is_string($ver) || stripos($ver, 'beta') === false) continue;
+        $expected = script_api_expected_beta($module);
+        if ($expected !== null && strcasecmp($ver, $expected) !== 0) {
+            $mf['dependencies'][$i]['version'] = $expected;
+            $changes[] = "{$module} {$ver} → {$expected}";
+        }
+    }
+    if (!$changes) return ['success' => false, 'message' => 'Nichts automatisch reparierbar'];
+
+    if (!file_exists($mfFile . '.mcadmin_orig')) @copy($mfFile, $mfFile . '.mcadmin_orig');
+    $json = json_encode($mf, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($json === false || file_put_contents($mfFile, $json . "\n") === false) {
+        return ['success' => false, 'message' => 'manifest.json konnte nicht geschrieben werden'];
+    }
+    return ['success' => true, 'changes' => $changes,
+            'message' => 'Repariert: ' . implode(', ', $changes) . ' — wirksam nach Server-Neustart'];
+}
+
+// Packs der aktiven Welt, die sich automatisch reparieren lassen (für den Hinweis im Dashboard).
+// Nutzt nur den Cache (kein Netzwerk), da es bei jedem Status-Abruf läuft.
+function detect_addon_issues(): array {
+    $world = get_active_world();
+    if (!$world) return [];
+    $wp  = get_world_packs($world);
+    $out = [];
+    foreach (['behavior', 'resource'] as $type) {
+        foreach ($wp[$type] ?? [] as $ref) {
+            if (($ref['enabled'] ?? true) === false) continue;
+            $version = ($ref['version'] ?? '?') === '?' ? null : $ref['version'];
+            $inst = find_installed_pack($type, $ref['uuid'], $version) ?? find_installed_pack($type, $ref['uuid']);
+            if (!$inst || empty($inst['folder'])) continue;
+            $a = analyze_pack($type, $inst['folder'], false, false);
+            if (!$a['fixable']) continue;
+            $out[] = ['world' => $world, 'type' => $type, 'uuid' => $inst['uuid'], 'name' => $inst['name'],
+                      'texts' => array_values(array_map(fn($f) => $f['text'], array_filter($a['findings'], fn($f) => $f['fixable'])))];
+        }
+    }
+    return $out;
+}
+
+// Kurzfassung des Addon-Checks für frisch installierte Packs (wird an die Upload-Meldung angehängt)
+function addon_check_summary(array $installed): string {
+    $bad = [];
+    foreach ($installed as $p) {
+        if (empty($p['folder']) || empty($p['type'])) continue;
+        $a = analyze_pack($p['type'], $p['folder']);
+        if (in_array($a['status'], ['warn', 'error'], true)) {
+            $bad[] = $p['name'] . ($a['fixable'] ? ' (reparierbar)' : '');
+        }
+    }
+    return $bad ? ' — ⚠️ Addon-Check: Probleme bei ' . implode(', ', $bad) . ' (Details im Packs-Tab)' : '';
 }

@@ -47,6 +47,7 @@ try {
                 'uptime'             => get_server_uptime(),
                 'experiment_issues'  => detect_missing_experiments(),
                 'engine_version_issues' => detect_engine_version_issues(),
+                'addon_issues'       => detect_addon_issues(),
             ]); break;
         case 'server_start':   echo json_encode(server_start());   break;  // Startet den Minecraft-Server
         case 'server_stop':    echo json_encode(server_stop());    break;  // Stoppt den Minecraft-Server
@@ -164,8 +165,20 @@ try {
             echo json_encode(['success'=>save_world_properties_values($world,$props),'message'=>'Einstellungen gespeichert']); break;
 
         // ── PACKS ─────────────────────────────────────────────
-        case 'get_packs':       // Gibt alle vom Panel installierten Packs zurück (Systempacks ausgeblendet)
-            echo json_encode(['behavior'=>get_installed_packs('behavior',true),'resource'=>get_installed_packs('resource',true)]); break;
+        case 'get_packs':       // Gibt alle vom Panel installierten Packs zurück (Systempacks ausgeblendet), inkl. Addon-Check
+            $out = ['behavior'=>get_installed_packs('behavior',true),'resource'=>get_installed_packs('resource',true)];
+            foreach ($out as $t => &$list) foreach ($list as &$p) $p['check'] = analyze_pack($t, $p['folder']);
+            unset($list, $p);
+            echo json_encode($out); break;
+        case 'fix_pack':        // Addon-Check: repariert ein Pack automatisch (z.B. veraltete Beta-Script-Version)
+            $uuid = strtolower($_POST['uuid'] ?? '');
+            $type = $_POST['type'] ?? '';
+            if (!preg_match('/^[a-f0-9\-]{36}$/', $uuid) || !in_array($type, ['behavior','resource'], true)) {
+                echo json_encode(['success'=>false,'message'=>'Ungültige Parameter']); break;
+            }
+            $inst = find_installed_pack($type, $uuid);
+            if (!$inst || empty($inst['user_pack'])) { echo json_encode(['success'=>false,'message'=>'Pack nicht gefunden']); break; }
+            echo json_encode(fix_pack($type, $inst['folder'])); break;
         case 'get_world_packs': // Gibt die aktiven Packs einer Welt zurück
             echo json_encode(get_world_packs($_POST['world']??get_active_world()??'')); break;
         case 'toggle_pack':     // Aktiviert oder deaktiviert ein Pack für eine Welt

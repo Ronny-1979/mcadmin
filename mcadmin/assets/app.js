@@ -7,6 +7,7 @@ const G={
   conPaused:false,conTimer:null,conActive:false,conHist:[],conHistIdx:-1,conLines:100,
   srvWasRunning:false,
   dismissedExp:new Set(),
+  dismissedAddon:new Set(),
   dismissedEngine:new Set(),
 };
 
@@ -107,6 +108,7 @@ async function refreshStatus(){
     G.srvWasRunning=s.running;
     renderExpBanner(s.experiment_issues||[]);
     renderEngineBanner(s.engine_version_issues||[]);
+    renderAddonBanner(s.addon_issues||[]);
   }catch(e){}
 }
 
@@ -991,6 +993,59 @@ async function loadWorldsForPacks(){
 async function loadAllPacks(){G.packs=await api('get_packs');renderPacks();}
 // Lädt die aktiven Packs der gewählten Welt (inkl. fehlende Packs) und rendert sie
 async function loadWPacks(){const w=document.getElementById('pk-world').value;if(!w||w==='__all__'){G.wPacks={behavior:[],resource:[]};renderPacks();return;}G.wPacks=await api('get_world_packs',{world:w});renderPacks();}
+// ═══ ADDON-CHECK ══════════════════════════════════════════
+// Ampel je Pack: läuft das Addon voraussichtlich mit der installierten Server-Version?
+function checkBadge(p){
+  const c=p.check;if(!c)return'';
+  const m={ok:['badge-g','✅ Kompatibel'],info:['badge-g','✅ Kompatibel'],warn:['badge-o','⚠️ Prüfen'],error:['badge-r','❌ Problem']}[c.status]||null;
+  return m?`<span class="badge ${m[0]}" title="Addon-Check">${m[1]}</span>`:'';
+}
+// Einzelne Befunde des Addon-Checks + „Reparieren“-Knopf, falls automatisch behebbar
+function checkDetails(p,t){
+  const c=p.check;if(!c||!c.findings||!c.findings.length)return'';
+  const ic={info:'ℹ️',warn:'⚠️',error:'❌'};
+  let h=c.findings.map(f=>`<div class="pkv" style="color:${f.level==='error'?'var(--red)':(f.level==='warn'?'var(--yellow)':'var(--text2)')};margin-top:2px">${ic[f.level]||''} ${e(f.text)}</div>`).join('');
+  if(c.fixable&&p.user_pack)h+=`<div style="margin-top:4px"><button class="btn warn xs" onclick="fixPack('${e(p.uuid)}','${t}',this)">🔧 Reparieren</button></div>`;
+  return h;
+}
+// Repariert ein Pack (z.B. Beta-Script-Version an den Server anpassen) und bietet einen Neustart an
+async function fixPack(uuid,type,btn){
+  if(!confirm('Pack automatisch reparieren?\n\nDie Script-Version im Manifest wird an die Server-Version angepasst. Das Original wird gesichert (manifest.json.mcadmin_orig).\n\nOb das Addon danach läuft, hängt davon ab, ob es nur Funktionen nutzt, die es noch gibt — Fehler stehen nach dem Neustart im Log.'))return;
+  if(btn)btn.disabled=true;
+  const r=await api('fix_pack',{uuid,type});
+  toast(r.message||(r.success?'Repariert':'Fehler'),r.success?'success':'error');
+  if(r.success){await loadAllPacks();await loadWPacks();offerRestart();}else if(btn)btn.disabled=false;
+}
+// Fragt nach einer Reparatur, ob der Server direkt neu gestartet werden soll
+async function offerRestart(){
+  if(!G.srv||!G.srv.running)return;
+  if(!confirm('Damit die Änderung wirkt, muss der Server neu starten. Jetzt neu starten?'))return;
+  toast('Server wird neu gestartet...','info');
+  const r=await api('server_restart');
+  toast(r.success?'Server neu gestartet':'Neustart fehlgeschlagen',r.success?'success':'error');
+  setTimeout(refreshStatus,1500);
+}
+// Hinweis im Dashboard: aktive Packs der Welt, die nicht zur Server-Version passen, aber reparierbar sind
+function renderAddonBanner(issues){
+  const el=document.getElementById('addon-banner');
+  if(!el)return;
+  const pending=issues.filter(x=>!G.dismissedAddon.has(x.world+'|'+x.uuid));
+  if(!pending.length){el.classList.add('hidden');el.innerHTML='';return;}
+  el.classList.remove('hidden');
+  el.innerHTML=pending.map(x=>`
+    <div class="ub" style="margin-bottom:8px">
+      <div>🧩</div>
+      <div style="flex:1;min-width:0">
+        <strong style="color:var(--yellow)">Addon passt nicht zur Server-Version:</strong>
+        Pack „${e(x.name)}" in Welt „${e(x.world)}": ${x.texts.map(t=>e(t)).join('; ')}
+      </div>
+      <div class="fx g6" style="flex-shrink:0">
+        <button class="btn warn sm" onclick="fixPack('${e(x.uuid)}','${e(x.type)}',this)">🔧 Reparieren</button>
+        <button class="btn ghost sm" onclick="G.dismissedAddon.add('${e(x.world)}|${e(x.uuid)}');refreshStatus()">Später</button>
+      </div>
+    </div>`).join('');
+}
+
 // Rendert die Pack-Listen: alle installierten Packs anzeigen, Toggle je nach Welt aktiv/inaktiv
 function renderPacks(){
   const world=document.getElementById('pk-world').value;
@@ -1011,7 +1066,7 @@ function renderPacks(){
     if(packs.length){
       html+=packs.map(p=>{
         const en=active.some(a=>{const id=typeof a==='string'?a:(a.pack_id??a.uuid);return id===p.uuid&&(a.enabled!==false);});
-        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)}</div>${worldBadges(p)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${showAll?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<label class="icon-btn" title="Pack aktualisieren" style="cursor:pointer">🔄<input type="file" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="replacePack('${e(p.uuid)}','${t}',this)"></label><button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
+        return`<div class="pkc"><div class="pki">${icon(p)}</div><div style="flex:1;min-width:0"><div class="pkn">${e(p.name)}</div><div class="pkd">${e(p.description||'—')}</div><div class="pkv">v${e(p.version)} ${subtypeBadge(p.subtype)} ${checkBadge(p)}</div>${worldBadges(p)}${checkDetails(p,t)}</div><label class="tgl"><input type="checkbox" ${en?'checked':''} ${showAll?'disabled':''} onchange="togglePk('${e(world)}','${e(p.uuid)}','${t}',this.checked)"><span class="tsl"></span></label>${p.user_pack?`<label class="icon-btn" title="Pack aktualisieren" style="cursor:pointer">🔄<input type="file" accept=".mcpack,.mcaddon,.zip" style="display:none" onchange="replacePack('${e(p.uuid)}','${t}',this)"></label><button class="icon-btn" title="Pack löschen" onclick="deletePack('${e(p.uuid)}','${t}','${e(p.name)}')">🗑</button>`:''}</div>`;
       }).join('');
     }
     // Fehlende Packs (UUID vorhanden, aber nicht installiert) — nur bei Weltauswahl

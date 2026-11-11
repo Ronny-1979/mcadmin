@@ -73,6 +73,8 @@ Vollständiger Editor für `server.properties` direkt im Browser, aufgeteilt in 
 ### 📦 Packs & Add-ons
 Globale Übersicht aller installierten Resource- und Behavior-Packs mit Welt-Auswahl. Packs aktivieren/deaktivieren, komplett löschen oder direkt durch eine neue Version ersetzen — alle Welt-Referenzen werden automatisch aktualisiert. Der Pack-Upload selbst erfolgt direkt in den Welten-Karten.
 
+**Addon-Check:** Jedes Pack bekommt eine Ampel (✅ kompatibel / ⚠️ prüfen / ❌ Problem), ob es zur installierten Server-Version passt. Erkannt werden u.a. Beta-Script-Versionen, die es nur in einer bestimmten Minecraft-Version gibt (häufigster Grund, warum Addons nach Updates nicht mehr laufen), zu hohe Mindestversionen, überschriebene Spieler-Dateien und nicht mehr unterstützte Shader. Veraltete Beta-Scripts lassen sich per **🔧 Reparieren** automatisch auf die passende Version setzen (Zuordnung über das offizielle npm-Paket `@minecraft/server`, Original-Manifest wird gesichert). Nach einem Server-Update weist das Dashboard auf betroffene Addons der aktiven Welt hin.
+
 ### 📋 Whitelist & Spieler
 Whitelist verwalten, OP-Status setzen und entziehen. Dazu eine Spieler-Statistik mit Spielzeit-Balkendiagramm, Session-Verlauf, Kicks und erstem Login.
 

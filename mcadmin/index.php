@@ -287,6 +287,7 @@ try {
 
     <div id="exp-banner" class="hidden"></div>
     <div id="engine-banner" class="hidden"></div>
+    <div id="addon-banner" class="hidden"></div>
 
     <!-- ═══ DASHBOARD ═══ -->
     <div id="page-dashboard" class="pc2">
@@ -661,7 +662,7 @@ try {
 </div><!-- /layout -->
 <div id="tc"></div>
 
-<script src="assets/app.js?v=33" defer></script>
+<script src="assets/app.js?v=34" defer></script>
 <?php endif; ?>
 </body>
 </html>

@@ -102,6 +102,27 @@ if (!empty($s['update_check_enabled'])) {
     }
 }
 
+// ------------------------------------------------------------
+// Addon-Check: Script-API-Versionen aktuell halten
+// ------------------------------------------------------------
+// Lädt für die Script-Module der aktiven Packs die zur Server-Version passende Beta-Version von
+// npm nach (nur wenn der Cache alt ist oder die Server-Version, z.B. nach einem Update, noch
+// fehlt — höchstens 1x pro Stunde). Damit erscheint der „Addon passt nicht“-Hinweis im
+// Dashboard auch ohne dass jemand den Packs-Tab öffnet.
+$aw = get_active_world();
+if ($aw) {
+    $wp = get_world_packs($aw);
+    foreach ($wp['behavior'] ?? [] as $ref) {
+        if (($ref['enabled'] ?? true) === false) continue;
+        $inst = find_installed_pack('behavior', $ref['uuid']);
+        if (!$inst || empty($inst['folder'])) continue;
+        foreach ((json_decode((string)@file_get_contents(MC_PACKS_BEHAVIOR_DIR . '/' . $inst['folder'] . '/manifest.json'), true)['dependencies'] ?? []) as $dep) {
+            $mod = is_array($dep) ? (string)($dep['module_name'] ?? '') : '';
+            if (str_starts_with($mod, '@minecraft/')) script_api_expected_beta($mod, true);
+        }
+    }
+}
+
 // Heartbeat: immer am Ende loggen, damit man sieht dass der Cron läuft
 // (auch wenn keine Aktion ausgeführt wurde)
 echo date('Y-m-d H:i:s') . " [cron] Lauf OK (TZ=" . date_default_timezone_get() . ")\n";
